@@ -17,6 +17,7 @@
 //
 #include <Protocol/PciIo.h>
 #include <IndustryStandard/Pci.h>
+#include <IndustryStandard/PeImage.h>
 
 //
 // Custom Driver Protocol
