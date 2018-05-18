@@ -1,4 +1,6 @@
 #include "drv.h"
+#include "asm.h"
+
 #define PAGE_SIZE 0x1000
 //
 // We support unload (but deny it)
@@ -109,16 +111,17 @@ CallbackSMI(
 	UtilWaitForKey();
 
 }
-VOID *ret_ExitBootServices = NULL;
-EFI_STATUS hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
-{
-	Print(L"In ExitBoot");
-	UtilWaitForKey();
 
+VOID *ret_ExitBootServices = NULL;
+
+EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
+{
 	UINTN i = 0;
 
 	// return address points to winload
 	VOID *Base = NULL, *Addr = (VOID *)((UINTN)ret_ExitBootServices & 0xfffffffffffff000);
+
+	char bFoundBase = 0;
 
 	// determinate winload.efi base address
 	while (i < PAGE_SIZE * 0x20)
@@ -136,19 +139,22 @@ EFI_STATUS hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 	if (Base == NULL)
 	{
 		Print(L"failed");
+		UtilWaitForKey();
 	}
 	else
 	{
-		Print(L"%X", Base);
+		Print(L"\n\r%X\n\r", Base);
+		bFoundBase = 1;
 	}
 
-	EFI_STATUS efiStatus = g_pOrgExitBootService(ImageHandle, MapKey);
+	if (bFoundBase)
+	{
 
-	// Now get Winload target address
-	//EFI_STATUS searchStatus = PatchWinload(startAddr, maxNumBytes);
+	}
 
-	UtilWaitForKey();
-	return efiStatus;
+	gBS->ExitBootServices = g_pOrgExitBootService;
+
+	return g_pOrgExitBootService(ImageHandle, MapKey);
 }
 
 EFI_STATUS
@@ -171,10 +177,11 @@ UefiMain (
                                                          &gComponentNameProtocol,
                                                          &gComponentName2Protocol);
 
+	//EFI_EVENT Event;
 	//gBootServices->CreateEventEx(0x200, 0x10, &CallbackSMI, NULL, &EXIT_BOOT_SERVICES_GUID, &Event);
 	g_pOrgExitBootService = gBS->ExitBootServices;
 
-	gBS->ExitBootServices = hkExitBootServices;
+	gBS->ExitBootServices = _ExitBootServices;
 
 	//if (enableHooks) eBs->ExitBootServices = ItSecExitBootServices;
 

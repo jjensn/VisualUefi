@@ -13,13 +13,23 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <Import Project="$(SolutionDir)\samples.default.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+  </ImportGroup>
   <Import Project="$(SolutionDir)\samples.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  </ImportGroup>
   <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   <ItemDefinitionGroup>
     <Link>
       <AdditionalDependencies>UefiDriverEntryPoint.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">del E:\$(TargetName).efi
+copy $(TargetPath) E:\</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="drvname.c" />
@@ -27,7 +37,11 @@
     <ClCompile Include="drvmain.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="asm.h" />
     <ClInclude Include="drv.h" />
     <ClInclude Include="drvproto.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="get_exit_bootservices_address.asm" />
   </ItemGroup>
 </Project>
