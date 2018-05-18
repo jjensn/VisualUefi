@@ -11,6 +11,7 @@
     <ClInclude Include="asm.h">
       <Filter>asm\amd64</Filter>
     </ClInclude>
+    <ClInclude Include="arc.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="asm">

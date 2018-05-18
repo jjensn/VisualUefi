@@ -1,5 +1,6 @@
 #include "drv.h"
 #include "asm.h"
+#include "arc.h"
 
 #define PAGE_SIZE 0x1000
 //
@@ -75,6 +76,64 @@ UefiUnload (
     return EFI_ACCESS_DENIED;
 }
 
+
+EFI_STATUS UtilFindPattern(IN UINT8* Pattern, IN UINT8 Wildcard, IN UINT32 PatternLength, VOID* Base, UINT32 Size, OUT VOID ** Found)
+{
+	if (Found == NULL || Pattern == NULL || Base == NULL)
+		return EFI_INVALID_PARAMETER;
+
+	for (UINT64 i = 0; i < Size - PatternLength; i++)
+	{
+		BOOLEAN found = TRUE;
+		for (UINT64 j = 0; j < PatternLength; j++)
+		{
+			if (Pattern[j] != Wildcard && Pattern[j] != ((UINT8*)Base)[i + j])
+			{
+				found = FALSE;
+				break;
+			}
+		}
+
+		if (found != FALSE)
+		{
+			*Found = (UINT8*)Base + i;
+			return EFI_SUCCESS;
+		}
+	}
+
+	return EFI_NOT_FOUND;
+}
+
+UINT8 * UtilFindPattern2(VOID* Base, UINT32 Size, const unsigned char* pattern, const char* mask)
+{
+	UINT32 pos = 0;
+	UINT32 maskLength = sizeof(mask) - 1;
+	
+	for(UINT32 i = 0; i < Size-maskLength ; i += 1)
+	{
+		UINT8 *Code = RVATOVA(Base, i);
+
+		if (*(Code) == pattern[pos] || mask[pos] == '?')
+		{
+			if (mask[pos + 1] == '\0')
+			{
+				Print(L"FOund!\r\n");
+				return Code;
+			}
+			//if(*(Code) == pattern[pos])
+			//	Print(L"\r\nFOUND SINGLE %lx \r\n", *(Code));
+			pos++;
+		}
+		else
+		{
+			pos = 0;
+			//Print(L"%lx", *(Code));
+		}
+	}
+
+	return NULL;
+}
+
 VOID
 EFIAPI
 InitializeLib(
@@ -113,6 +172,11 @@ CallbackSMI(
 }
 
 VOID *ret_ExitBootServices = NULL;
+PLOADER_PARAMETER_BLOCK loader = NULL;
+
+UINT8 sigOslArchTransferToKernelCall[] = { 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0xEB, 0xFE }; // 48 8B 45 A8 33 FF
+UINT8* OslArchTransferToKernelCallPatchLocation;
+UINT8 OslArchTransferToKernelCallBackup[5];
 
 EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 {
@@ -136,12 +200,7 @@ EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 		i += PAGE_SIZE;
 	}
 
-	if (Base == NULL)
-	{
-		Print(L"failed");
-		UtilWaitForKey();
-	}
-	else
+	if (Base != NULL)
 	{
 		Print(L"\n\r%X\n\r", Base);
 		bFoundBase = 1;
@@ -149,8 +208,54 @@ EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 
 	if (bFoundBase)
 	{
+		//UINT8* Found = NULL;
+		EFI_IMAGE_NT_HEADERS *pHeaders = NULL;
+		//void *origBase = Base;
+		pHeaders = (EFI_IMAGE_NT_HEADERS *)RVATOVA(Base, ((EFI_IMAGE_DOS_HEADER *)Base)->e_lfanew);
 
+		//EFI_STATUS EfiStatus = EFI_SUCCESS;
+
+		// Find right location to patch
+		Print(L"Starting scan %lx\n", pHeaders->OptionalHeader.SizeOfImage);
+
+		//EfiStatus = UtilFindPattern(sigOslArchTransferToKernelCall, 0xCC, sizeof(sigOslArchTransferToKernelCall), RVATOVA(Base, 0), pHeaders->OptionalHeader.SizeOfImage, (VOID**)&Found);
+		
+		UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\x48\x33\xF6\x4C\x8B\xE1\x4C\x8B\xEA", "xxxxxxxxx");
+
+		if (p)
+		{
+			Print(L"FOUND %lx", p);
+		}
+		else
+		{
+			Print(L"Not found");
+		}
+		UtilWaitForKey();
 	}
+
+	/*
+	UINTN MemoryMapSize;
+    EFI_MEMORY_DESCRIPTOR *MemoryMap;
+    UINTN LocalMapKey;
+    UINTN DescriptorSize;
+    UINT32 DescriptorVersion;
+    MemoryMap = NULL;
+    MemoryMapSize = 0;
+   
+    do {  
+        Status = gBS->GetMemoryMap(&MemoryMapSize, MemoryMap, &LocalMapKey, &DescriptorSize,&DescriptorVersion);
+        if (Status == EFI_BUFFER_TOO_SMALL){
+            MemoryMap = AllocatePool(MemoryMapSize + 1);
+            Status = gBS->GetMemoryMap(&MemoryMapSize, MemoryMap, &LocalMapKey, &DescriptorSize,&DescriptorVersion);      
+        } else {
+            
+	}
+		DbgPrint(L"This time through the memory map loop, status = %r\n", Status);
+
+	} while (Status != EFI_SUCCESS);
+
+	return gOrigExitBootServices(ImageHandle, LocalMapKey);
+	*/
 
 	gBS->ExitBootServices = g_pOrgExitBootService;
 

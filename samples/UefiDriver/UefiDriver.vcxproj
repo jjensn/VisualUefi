@@ -37,6 +37,7 @@ copy $(TargetPath) E:\</Command>
     <ClCompile Include="drvmain.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="arc.h" />
     <ClInclude Include="asm.h" />
     <ClInclude Include="drv.h" />
     <ClInclude Include="drvproto.h" />

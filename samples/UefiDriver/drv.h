@@ -6,6 +6,7 @@
 #include <Library/DebugLib.h>
 #include <Library/MemoryAllocationLib.h>
 
+
 //
 // Boot and Runtime Services
 //
@@ -18,6 +19,7 @@
 #include <Protocol/PciIo.h>
 #include <IndustryStandard/Pci.h>
 #include <IndustryStandard/PeImage.h>
+
 
 //
 // Custom Driver Protocol
@@ -90,3 +92,19 @@ extern EFI_DRIVER_BINDING_PROTOCOL gDriverBindingProtocol;
 extern EFI_COMPONENT_NAME2_PROTOCOL gComponentName2Protocol;
 extern EFI_COMPONENT_NAME_PROTOCOL gComponentNameProtocol;
 
+//dtypedef VOID(EFIAPI *tOslArchTransferToKernel)(PLOADER_PARAMETER_BLOCK KernelParams, VOID *KiSystemStartup);
+
+//tOslArchTransferToKernel oOslArchTransferToKernel = NULL;
+typedef unsigned char UCHAR;
+typedef UCHAR* PUCHAR;
+#if defined(_M_X64) || defined(__amd64__)
+
+typedef EFI_IMAGE_NT_HEADERS64 EFI_IMAGE_NT_HEADERS;
+
+#else
+
+typedef EFI_IMAGE_NT_HEADERS32 EFI_IMAGE_NT_HEADERS;
+
+#endif
+
+#define RVATOVA(_base_, _offset_) ((UCHAR*)(_base_) + (UINT32)(_offset_))
