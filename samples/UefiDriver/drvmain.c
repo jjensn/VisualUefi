@@ -219,8 +219,16 @@ EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 		Print(L"Starting scan %lx\n", pHeaders->OptionalHeader.SizeOfImage);
 
 		//EfiStatus = UtilFindPattern(sigOslArchTransferToKernelCall, 0xCC, sizeof(sigOslArchTransferToKernelCall), RVATOVA(Base, 0), pHeaders->OptionalHeader.SizeOfImage, (VOID**)&Found);
-		
-		UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\x48\x33\xF6\x4C\x8B\xE1\x4C\x8B\xEA", "xxxxxxxxx");
+		/*
+			33 F6 4C 8B E1 4C 8B EA
+			33 F6                                           xor     esi, esi
+			4C 8B E1                                        mov     r12, rcx
+			4C 8B EA                                        mov     r13, rdx
+			0F 09                                           wbinvd
+			48 2B C0                                        sub     rax, rax
+			66 8E D0
+		*/
+		UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\x33\xF6\x4C\x8B\xE1\x4C\x8B\xEA", "xxxxxxxx");
 
 		if (p)
 		{
