@@ -1,6 +1,11 @@
+#include <Library/DevicePathLib.h>
+#include <Library/BaseMemoryLib.h>
 #include "drv.h"
 #include "asm.h"
 #include "arc.h"
+#include "utils.h"
+
+
 
 #define PAGE_SIZE 0x1000
 //
@@ -63,7 +68,8 @@ EFI_GUID EXIT_BOOT_SERVICES_GUID =
 { 0x27abf055, 0xb1b8, 0x4c26, { 0x80, 0x48, 0x74, 0x8f, 0x37, 0xba, 0xa2, 0xdf } };
 
 EFI_EXIT_BOOT_SERVICES g_pOrgExitBootService = NULL;
-
+void *Base = NULL;
+EFI_IMAGE_NT_HEADERS *pHeaders = NULL;
 EFI_STATUS
 EFIAPI
 UefiUnload (
@@ -77,41 +83,14 @@ UefiUnload (
 }
 
 
-EFI_STATUS UtilFindPattern(IN UINT8* Pattern, IN UINT8 Wildcard, IN UINT32 PatternLength, VOID* Base, UINT32 Size, OUT VOID ** Found)
-{
-	if (Found == NULL || Pattern == NULL || Base == NULL)
-		return EFI_INVALID_PARAMETER;
-
-	for (UINT64 i = 0; i < Size - PatternLength; i++)
-	{
-		BOOLEAN found = TRUE;
-		for (UINT64 j = 0; j < PatternLength; j++)
-		{
-			if (Pattern[j] != Wildcard && Pattern[j] != ((UINT8*)Base)[i + j])
-			{
-				found = FALSE;
-				break;
-			}
-		}
-
-		if (found != FALSE)
-		{
-			*Found = (UINT8*)Base + i;
-			return EFI_SUCCESS;
-		}
-	}
-
-	return EFI_NOT_FOUND;
-}
-
-UINT8 * UtilFindPattern2(VOID* Base, UINT32 Size, const unsigned char* pattern, const char* mask)
+UINT8 * UtilFindPattern2(VOID* Based, UINT32 Size, const unsigned char* pattern, const char* mask)
 {
 	UINT32 pos = 0;
 	UINT32 maskLength = sizeof(mask) - 1;
 	
 	for(UINT32 i = 0; i < Size-maskLength ; i += 1)
 	{
-		UINT8 *Code = RVATOVA(Base, i);
+		UINT8 *Code = RVATOVA(Based, i);
 
 		if (*(Code) == pattern[pos] || mask[pos] == '?')
 		{
@@ -150,15 +129,6 @@ InitializeLib(
 	gRT = gRuntimeServices;
 }
 
-VOID UtilWaitForKey(VOID)
-{
-	UINTN index = 0;
-	EFI_INPUT_KEY key = { 0 };
-	gBS->WaitForEvent(1, &gST->ConIn->WaitForKey, &index);
-	gST->ConIn->ReadKeyStroke(gST->ConIn, &key);
-}
-
-
 VOID
 EFIAPI
 CallbackSMI(
@@ -169,21 +139,96 @@ CallbackSMI(
 	Print(L"Hi there");
 	UtilWaitForKey();
 
+	UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\x48\x8B\x3D\x00\x00\x00\x00\x48\x8B\xCF", "xxx????xxx");
+	if (p)
+	{
+		Print(L"FOUND %lx\r\n", p + 3);
+		//GlobalNames = reinterpret_cast<decltype(GlobalNames)>(*(UINT32*)(p + 3));
+		UINT64 ldrblk = (*(UINT32*)(p + 3));
+		Print(L"Here %lx\r\n", ldrblk);
+		UtilWaitForKey();
+
+		PLOADER_PARAMETER_BLOCK blk;
+		blk = (PLOADER_PARAMETER_BLOCK)&ldrblk;
+
+		Print(L"Here1 %lx\r\n", blk);
+		UtilWaitForKey();
+
+		Print(L"mehh %lx\r\n", blk->Size);
+		Print(L"mehh %l\r\n", blk->OsMajorVersion);
+
+		//Print(L"yyyy %lx\r\n", blk->BootDriverListHead.ForwardLink);
+
+		Print(L"zzz %lc\r\n", blk->Extension->AcpiBiosVersion);
+		Print(L"aaaaaaaaa %lx\r\n", blk->Extension->DrvDBSize);
+		Print(L"bbbbb %lx\r\n", blk->FirmwareInformation.v.EfiRuntimePageProtectionSupported);
+		Print(L"ccc %lx\r\n", blk->FirmwareInformation.v.EfiRuntimePageProtectionEnabled);
+
+		/*while(pENTRY != NULL)
+		{
+		PBOOT_DRIVER_LIST_ENTRY pStrct;
+		//
+		// Do some processing.
+		//
+		pStrct = (PBOOT_DRIVER_LIST_ENTRY)CONTAINING_RECORD(pENTRY, BOOT_DRIVER_LIST_ENTRY, Link);
+		//
+		//Move to next Entry in list.
+		//
+		pENTRY = pENTRY->ForwardLink;
+		Print(L"xxx %lx\r\n", pENTRY);
+		}*/
+		/*oOslArchTransferToKernel = (tOslArchTransferToKernel)UtilCallAddress(p);
+		Print(L"OslArchTransferToKernel at %lx\r\n", oOslArchTransferToKernel);
+		Print(L"OslArchTransferToKernelHook at %lx\r\n", &hkOslArchTransferToKernel);
+
+		// Backup original function bytes before patching
+		OslArchTransferToKernelCallPatchLocation = (VOID*)p;
+		CopyMem((VOID*)OslArchTransferToKernelCallBackup, (VOID*)p, 5);
+
+		// display original code
+		//Print(L"Original:\r\n");
+		//UtilDisassembleCode((UINT8*)p, (VOID*)p, 5);
+
+		// Do patching
+		*(UINT8*)p = 0xE8;
+		*(UINT32*)(p + 1) = UtilCalcRelativeCallOffset((VOID*)p, (VOID*)&hkOslArchTransferToKernel);
+
+		// Display patched code
+		//Print(L"Patched:\r\n");
+		//UtilDisassembleCode((UINT8*)p, (VOID*)p, 5);*/
+	}
+	else
+	{
+		Print(L"Not found");
+	}
+	UtilWaitForKey();
+
 }
 
 VOID *ret_ExitBootServices = NULL;
-PLOADER_PARAMETER_BLOCK loader = NULL;
 
-UINT8 sigOslArchTransferToKernelCall[] = { 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0xEB, 0xFE }; // 48 8B 45 A8 33 FF
-UINT8* OslArchTransferToKernelCallPatchLocation;
-UINT8 OslArchTransferToKernelCallBackup[5];
+
+VOID EFIAPI hkOslArchTransferToKernel(PLOADER_PARAMETER_BLOCK KernelParams, VOID *KiSystemStartup)
+{
+
+	//__debugbreak();
+
+	//
+	// Before we do anything, restore original call bytes
+	//
+	*(UINT32*)(OslArchTransferToKernelCallPatchLocation + 1) = *(UINT32*)(OslArchTransferToKernelCallBackup + 1);
+
+	Print(L"im in the arch transfer");
+	UtilWaitForKey();
+	oOslArchTransferToKernel(KernelParams, KiSystemStartup);
+}
 
 EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 {
 	UINTN i = 0;
 
 	// return address points to winload
-	VOID *Base = NULL, *Addr = (VOID *)((UINTN)ret_ExitBootServices & 0xfffffffffffff000);
+	VOID *Addr = (VOID *)((UINTN)ret_ExitBootServices & 0xfffffffffffff000);
 
 	char bFoundBase = 0;
 
@@ -209,7 +254,7 @@ EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 	if (bFoundBase)
 	{
 		//UINT8* Found = NULL;
-		EFI_IMAGE_NT_HEADERS *pHeaders = NULL;
+		
 		//void *origBase = Base;
 		pHeaders = (EFI_IMAGE_NT_HEADERS *)RVATOVA(Base, ((EFI_IMAGE_DOS_HEADER *)Base)->e_lfanew);
 
@@ -227,18 +272,18 @@ EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 			0F 09                                           wbinvd
 			48 2B C0                                        sub     rax, rax
 			66 8E D0
-		*/
-		UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\x33\xF6\x4C\x8B\xE1\x4C\x8B\xEA", "xxxxxxxx");
 
-		if (p)
-		{
-			Print(L"FOUND %lx", p);
-		}
-		else
-		{
-			Print(L"Not found");
-		}
-		UtilWaitForKey();
+			48 8B 15 0D ED 18 00                            mov     rdx, cs:OslEntryPoint
+			48 8B CF                                        mov     rcx, rdi
+			E8 4D 04 12 00
+		*/
+		//UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\x33\xF6\x4C\x8B\xE1\x4C\x8B\xEA", "xxxxxxxx");
+		
+		// 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0xEB, 0xFE
+		// UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\xE8\xAA\xAA\xAA\xAA\x45\x33", "x????xx");
+
+		//\x48\x8B\x3D\x00\x00\x00\x00\x48\x8B\xCF xxx????xxx
+		
 	}
 
 	/*
@@ -266,7 +311,7 @@ EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 	*/
 
 	gBS->ExitBootServices = g_pOrgExitBootService;
-
+	
 	return g_pOrgExitBootService(ImageHandle, MapKey);
 }
 
@@ -290,8 +335,8 @@ UefiMain (
                                                          &gComponentNameProtocol,
                                                          &gComponentName2Protocol);
 
-	//EFI_EVENT Event;
-	//gBootServices->CreateEventEx(0x200, 0x10, &CallbackSMI, NULL, &EXIT_BOOT_SERVICES_GUID, &Event);
+	EFI_EVENT Event;
+	gBootServices->CreateEventEx(0x200, 0x10, &CallbackSMI, NULL, &EXIT_BOOT_SERVICES_GUID, &Event);
 	g_pOrgExitBootService = gBS->ExitBootServices;
 
 	gBS->ExitBootServices = _ExitBootServices;

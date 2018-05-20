@@ -4,6 +4,7 @@
     <ClCompile Include="drvname.c" />
     <ClCompile Include="drvpnp.c" />
     <ClCompile Include="drvmain.c" />
+    <ClCompile Include="utils.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="drv.h" />
@@ -12,6 +13,7 @@
       <Filter>asm\amd64</Filter>
     </ClInclude>
     <ClInclude Include="arc.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="asm">

@@ -35,12 +35,14 @@ copy $(TargetPath) E:\</Command>
     <ClCompile Include="drvname.c" />
     <ClCompile Include="drvpnp.c" />
     <ClCompile Include="drvmain.c" />
+    <ClCompile Include="utils.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="arc.h" />
     <ClInclude Include="asm.h" />
     <ClInclude Include="drv.h" />
     <ClInclude Include="drvproto.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="get_exit_bootservices_address.asm" />

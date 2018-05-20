@@ -918,3 +918,133 @@ typedef struct _LOADER_PARAMETER_BLOCK
 	} u;
 	FIRMWARE_INFORMATION_LOADER_BLOCK FirmwareInformation;
 } LOADER_PARAMETER_BLOCK, *PLOADER_PARAMETER_BLOCK;
+
+typedef VOID(EFIAPI *tOslArchTransferToKernel)(PLOADER_PARAMETER_BLOCK KernelParams, VOID *KiSystemStartup);
+UINT8 sigOslArchTransferToKernelCall[] = { 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0xEB, 0xFE }; // 48 8B 45 A8 33 FF
+UINT8* OslArchTransferToKernelCallPatchLocation;
+UINT8 OslArchTransferToKernelCallBackup[5];
+
+tOslArchTransferToKernel oOslArchTransferToKernel = NULL;
+
+typedef struct _LDR_DATA_TABLE_ENTRY
+{
+	//
+	// in load order link list entry,offset = 0
+	//
+	LIST_ENTRY											InLoadOrderLinks;
+
+	//
+	// in memory order link list entry,offset = 8
+	//
+	LIST_ENTRY											InMemoryOrderLinks;
+
+	//
+	// in initialization order list entry,offset = 10
+	//
+	LIST_ENTRY											InInitializationOrderLinks;
+
+	//
+	// image base,offset = 18
+	//
+	VOID*												DllBase;
+
+	//
+	// entry point,offset = 1c
+	//
+	VOID*												EntryPoint;
+
+	//
+	// size of image,offset = 20
+	//
+	VOID*												SizeOfImage;
+
+	//
+	// full dll name,offset = 24
+	//
+	UNICODE_STRING										FullDllName;
+
+	//
+	// base dll name,offset = 2c
+	//
+	UNICODE_STRING										BaseDllName;
+
+	//
+	// flags,offset = 34
+	//
+	UINT32												Flags;
+
+	//
+	// reference count,offset = 38
+	//
+	UINT16												LoadCount;
+
+	//
+	// thread local storage index,offset = 3a
+	//
+	UINT16												TlsIndex;
+
+	union
+	{
+		//
+		// hash links,offset = 3c
+		//
+		LIST_ENTRY										HashLinks;
+
+		//
+		// section and checksum
+		//
+		struct
+		{
+			//
+			// section pointer,offset = 3c
+			//
+			VOID*										SectionPointer;
+
+			//
+			// checksum,offset = 40
+			//
+			UINT32										CheckSum;
+		} u;
+	} v;
+
+	union
+	{
+		//
+		// time stamp,offset = 44
+		//
+		UINT32											TimeDateStamp;
+
+		//
+		// loaded imports,offset = 44
+		//
+		VOID*											LoadedImports;
+	} x;
+
+	//
+	// entry point activation context,offset = 48
+	//
+	VOID*												EntryPointActivationContext;
+}LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
+
+typedef struct _BOOT_DRIVER_LIST_ENTRY
+{
+	//
+	// link
+	//
+	LIST_ENTRY											Link;
+
+	//
+	// file path
+	//
+	UNICODE_STRING										FilePath;
+
+	//
+	// registry path
+	//
+	UNICODE_STRING										RegistryPath;
+
+	//
+	// loader entry
+	//
+	PLDR_DATA_TABLE_ENTRY								LdrEntry;
+}BOOT_DRIVER_LIST_ENTRY, *PBOOT_DRIVER_LIST_ENTRY;

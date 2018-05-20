@@ -6,7 +6,6 @@ public _ExitBootServices
 ; handler and return address for ExitBootServices() hook
 extern ret_ExitBootServices:qword
 extern hkExitBootServices:proc
-extern loader:qword
 
 get_addr:
 
