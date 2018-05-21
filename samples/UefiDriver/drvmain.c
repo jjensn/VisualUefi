@@ -4,7 +4,7 @@
 #include "asm.h"
 #include "arc.h"
 #include "utils.h"
-
+#include "bootloader.h"
 
 
 #define PAGE_SIZE 0x1000
@@ -67,9 +67,36 @@ EFI_GUID DEVICE_PATH_PROTOCOL_GUID =
 EFI_GUID EXIT_BOOT_SERVICES_GUID =
 { 0x27abf055, 0xb1b8, 0x4c26, { 0x80, 0x48, 0x74, 0x8f, 0x37, 0xba, 0xa2, 0xdf } };
 
+EFI_GUID CC = { 0x13fa7698, 0xc831, 0x49c7,{ 0x87, 0xea, 0x8f, 0x43, 0xfc, 0xc2, 0x51, 0x96 } };
+
 EFI_EXIT_BOOT_SERVICES g_pOrgExitBootService = NULL;
+EFI_IMAGE_LOAD g_pImageLoad = NULL;
+EFI_IMAGE_START g_pImageStart = NULL;
+
 void *Base = NULL;
 EFI_IMAGE_NT_HEADERS *pHeaders = NULL;
+PLOADER_PARAMETER_BLOCK blk;
+
+PKLDR_DATA_TABLE_ENTRY GetLoadedModule(LIST_ENTRY* LoadOrderListHead, CHAR16* ModuleName)
+{
+	if (ModuleName == NULL || LoadOrderListHead == NULL)
+		return NULL;
+
+	for (LIST_ENTRY* ListEntry = LoadOrderListHead->ForwardLink; ListEntry != LoadOrderListHead; ListEntry = ListEntry->ForwardLink)
+	{
+		PKLDR_DATA_TABLE_ENTRY Entry = CONTAINING_RECORD(ListEntry, KLDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+		if (Entry)
+		{
+			Print(L"image %s\r\n", Entry->BaseImageName.Buffer);
+		}
+		if (Entry && (StrnCmp(Entry->BaseImageName.Buffer, ModuleName, Entry->BaseImageName.Length) == 0))
+			return Entry;
+	}
+
+	return NULL;
+}
+
+
 EFI_STATUS
 EFIAPI
 UefiUnload (
@@ -129,40 +156,64 @@ InitializeLib(
 	gRT = gRuntimeServices;
 }
 
-VOID
+
+/*VOID
 EFIAPI
 CallbackSMI(
 	IN  EFI_EVENT	Event,
 	IN  VOID      *Context
 )
 {
-	Print(L"Hi there");
-	UtilWaitForKey();
-
 	UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\x48\x8B\x3D\x00\x00\x00\x00\x48\x8B\xCF", "xxx????xxx");
 	if (p)
 	{
 		Print(L"FOUND %lx\r\n", p + 3);
-		//GlobalNames = reinterpret_cast<decltype(GlobalNames)>(*(UINT32*)(p + 3));
+		UINT32* pGNamesOffset = (UINT32*)(p + 3);
+		Print(L"FOUND %lx\r\n", pGNamesOffset);
+		UINT64 *t = ((UINT64*)(*p + 7 + pGNamesOffset));
 		UINT64 ldrblk = (*(UINT32*)(p + 3));
 		Print(L"Here %lx\r\n", ldrblk);
-		UtilWaitForKey();
+		Print(L"Her1e %lx\r\n", t);
+		//UtilWaitForKey();
 
-		PLOADER_PARAMETER_BLOCK blk;
-		blk = (PLOADER_PARAMETER_BLOCK)&ldrblk;
+		
+		blk = (PLOADER_PARAMETER_BLOCK)&t;
 
-		Print(L"Here1 %lx\r\n", blk);
-		UtilWaitForKey();
+		//AsciiPrint("meh4h %a\r\n", blk->);
+		//AsciiPrint("meh4h %s\r\n", *blk->ArcBootDeviceName);
+		//AsciiPrint("meh4h %s\r\n", blk->ArcBootDeviceName);
+		//Print(L"meh4h %a\r\n", blk->ArcBootDeviceName);
+		Print(L"meh4h %lx\r\n", blk->BootDriverListHead.ForwardLink);
 
-		Print(L"mehh %lx\r\n", blk->Size);
-		Print(L"mehh %l\r\n", blk->OsMajorVersion);
+		blk->BootDriverListHead.ForwardLink = NULL;
+		blk->LoadOptions = 0x000;
+		blk->Extension->BootFlags = 0x00000;
+		blk->RegistryBase = 0x0000;
 
-		//Print(L"yyyy %lx\r\n", blk->BootDriverListHead.ForwardLink);
 
-		Print(L"zzz %lc\r\n", blk->Extension->AcpiBiosVersion);
-		Print(L"aaaaaaaaa %lx\r\n", blk->Extension->DrvDBSize);
-		Print(L"bbbbb %lx\r\n", blk->FirmwareInformation.v.EfiRuntimePageProtectionSupported);
-		Print(L"ccc %lx\r\n", blk->FirmwareInformation.v.EfiRuntimePageProtectionEnabled);
+		//LIST_ENTRY *pEntry = blk->BootDriverListHead.ForwardLink;
+		//PBLDR_DATA_TABLE_ENTRY pLdrEntry;
+		//Print(L"first: %lx\r\n", pEntry);
+
+		//pLdrEntry = (PBLDR_DATA_TABLE_ENTRY)CONTAINING_RECORD(pEntry, LOADER_PARAMETER_BLOCK, LoadOrderListHead);
+
+
+		/*while (pEntry != blk->BootDriverListHead.BackLink)
+		{
+			// Retrieve the current MODULE_ENTRY
+			//CurModule = &pModuleInformationTable->Modules[CurCount++];
+
+			// Retrieve the current LDR_DATA_TABLE_ENTRY
+			pLdrEntry = (PBLDR_DATA_TABLE_ENTRY)CONTAINING_RECORD(pEntry, LOADER_PARAMETER_BLOCK ,LoadOrderListHead);
+
+			Print(L"here %lx\r\n", pEntry);
+
+			Print(L"%Z\r\n", pLdrEntry->CertificateIssuer);
+
+			// Iterate to the next entry
+			pEntry = pEntry->ForwardLink;
+		}*/
+
 
 		/*while(pENTRY != NULL)
 		{
@@ -176,52 +227,342 @@ CallbackSMI(
 		//
 		pENTRY = pENTRY->ForwardLink;
 		Print(L"xxx %lx\r\n", pENTRY);
-		}*/
-		/*oOslArchTransferToKernel = (tOslArchTransferToKernel)UtilCallAddress(p);
-		Print(L"OslArchTransferToKernel at %lx\r\n", oOslArchTransferToKernel);
-		Print(L"OslArchTransferToKernelHook at %lx\r\n", &hkOslArchTransferToKernel);
-
-		// Backup original function bytes before patching
-		OslArchTransferToKernelCallPatchLocation = (VOID*)p;
-		CopyMem((VOID*)OslArchTransferToKernelCallBackup, (VOID*)p, 5);
+		}
+		
 
 		// display original code
 		//Print(L"Original:\r\n");
 		//UtilDisassembleCode((UINT8*)p, (VOID*)p, 5);
 
 		// Do patching
-		*(UINT8*)p = 0xE8;
-		*(UINT32*)(p + 1) = UtilCalcRelativeCallOffset((VOID*)p, (VOID*)&hkOslArchTransferToKernel);
-
+		
 		// Display patched code
 		//Print(L"Patched:\r\n");
-		//UtilDisassembleCode((UINT8*)p, (VOID*)p, 5);*/
+		//UtilDisassembleCode((UINT8*)p, (VOID*)p, 5);
 	}
 	else
 	{
 		Print(L"Not found");
 	}
-	UtilWaitForKey();
+	//UtilWaitForKey();
 
 }
-
+*/
 VOID *ret_ExitBootServices = NULL;
-
+VOID *ret_LoadImage = NULL;
 
 VOID EFIAPI hkOslArchTransferToKernel(PLOADER_PARAMETER_BLOCK KernelParams, VOID *KiSystemStartup)
 {
-
+	Print(L"im in the arch transfer");
+	UtilWaitForKey();
 	//__debugbreak();
 
 	//
 	// Before we do anything, restore original call bytes
-	//
-	*(UINT32*)(OslArchTransferToKernelCallPatchLocation + 1) = *(UINT32*)(OslArchTransferToKernelCallBackup + 1);
 
-	Print(L"im in the arch transfer");
-	UtilWaitForKey();
-	oOslArchTransferToKernel(KernelParams, KiSystemStartup);
+	//KernelParams->LoadOrderListHead.ForwardLink = NULL;
+	//
+	//*(UINT32*)(OslArchTransferToKernelCallPatchLocation + 1) = *(UINT32*)(OslArchTransferToKernelCallBackup + 1);
+
+	
+	//oOslArchTransferToKernel(KernelParams, KiSystemStartup);
 }
+
+CHAR16 *
+EFIAPI
+FileDevicePathToText(EFI_DEVICE_PATH_PROTOCOL *FilePathProto)
+{
+	EFI_STATUS					Status;
+	FILEPATH_DEVICE_PATH 				*FilePath;
+	CHAR16								FilePathText[256]; // possible problem: if filepath is bigger
+	CHAR16								*OutFilePathText;
+	UINTN								Size;
+	UINTN								SizeAll;
+	UINTN								i;
+
+	FilePathText[0] = L'\0';
+	i = 4;
+	SizeAll = 0;
+	//DBG("FilePathProto->Type: %d, SubType: %d, Length: %d\n", FilePathProto->Type, FilePathProto->SubType, DevicePathNodeLength(FilePathProto));
+	while (FilePathProto != NULL && FilePathProto->Type != END_DEVICE_PATH_TYPE && i > 0) {
+		if (FilePathProto->Type == MEDIA_DEVICE_PATH && FilePathProto->SubType == MEDIA_FILEPATH_DP) {
+			FilePath = (FILEPATH_DEVICE_PATH *)FilePathProto;
+			Size = (DevicePathNodeLength(FilePathProto) - 4) / 2;
+			if (SizeAll + Size < 256) {
+				if (SizeAll > 0 && FilePathText[SizeAll / 2 - 2] != L'\\') {
+					StrCat(FilePathText, L"\\");
+				}
+				StrCat(FilePathText, FilePath->PathName);
+				SizeAll = StrSize(FilePathText);
+			}
+		}
+		FilePathProto = NextDevicePathNode(FilePathProto);
+		//DBG("FilePathProto->Type: %d, SubType: %d, Length: %d\n", FilePathProto->Type, FilePathProto->SubType, DevicePathNodeLength(FilePathProto));
+		i--;
+		//DBG("FilePathText: %s\n", FilePathText);
+	}
+
+	OutFilePathText = NULL;
+	Size = StrSize(FilePathText);
+	if (Size > 2) {
+		// we are allocating mem here - should be released by caller
+		Status = gBS->AllocatePool(EfiBootServicesData, Size, (VOID*)&OutFilePathText);
+		if (Status == EFI_SUCCESS) {
+			StrCpy(OutFilePathText, FilePathText);
+		}
+		else {
+			OutFilePathText = NULL;
+		}
+	}
+
+	return OutFilePathText;
+}
+//typedef EFI_STATUS(EFIAPI *tImgArchEfiStartBootApplication)(PBL_APPLICATION_ENTRY AppEntry, VOID* ImageBase, UINT32 ImageSize, UINT8 BootOption, PBL_RETURN_ARGUMENTS ReturnArguments);
+typedef __int64(__fastcall *tRtlImageNtHeaderEx)(int a1, unsigned __int64 a2, unsigned __int64 a3, unsigned __int64 *a4);
+//E8 ? ? ? ? 48 8B 45 17
+UINT8 sigRtl[] = { 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0x48, 0x8B, 0x45, 0x17 };
+UINT8* ImgArchEfiStartBootApplicationPatchLocation = NULL;
+UINT8 ImgArchEfiStartBootApplicationBackup[5] = { 0 };
+
+tRtlImageNtHeaderEx oRtlImageNtHeaderEx = NULL;
+
+/*EFI_STATUS EFIAPI hkImgArchEfiStartBootApplication(PBL_APPLICATION_ENTRY AppEntry, VOID* ImageBase, UINT32 ImageSize, UINT8 BootOption, PBL_RETURN_ARGUMENTS ReturnArguments)
+{
+	//PIMAGE_NT_HEADERS NtHdr = NULL;
+
+	// Restore original bytes to call
+	CopyMem(ImgArchEfiStartBootApplicationPatchLocation, ImgArchEfiStartBootApplicationBackup, 5);
+
+	// Clear the screen
+	//gST->ConOut->ClearScreen(gST->ConOut);
+
+	//NtHdr = ImageNtHeader(ImageBase);
+	//if (NtHdr != NULL)
+	{
+		EFI_STATUS EfiStatus = EFI_SUCCESS;
+		UINT8* Found = NULL;
+
+		// Find right location to patch
+		EfiStatus = UtilFindPattern(sigOslArchTransferToKernelCall, 0xCC, sizeof(sigOslArchTransferToKernelCall), ImageBase, ImageSize, (VOID**)&Found);
+		if (EfiStatus == EFI_SUCCESS)
+		{
+			Print(L"Found OslArchTransferToKernel call at %lx\r\n", Found);
+
+			// Get original from call instruction
+			oOslArchTransferToKernel = (tOslArchTransferToKernel)UtilCallAddress(Found);
+			Print(L"OslArchTransferToKernel at %lx\r\n", oOslArchTransferToKernel);
+			Print(L"OslArchTransferToKernelHook at %lx\r\n", &hkOslArchTransferToKernel);
+
+			// Backup original function bytes before patching
+			OslArchTransferToKernelCallPatchLocation = (VOID*)Found;
+			CopyMem((VOID*)OslArchTransferToKernelCallBackup, (VOID*)Found, 5);
+
+			// display original code
+			//Print(L"Original:\r\n");
+			//UtilDisassembleCode((UINT8*)Found, (VOID*)Found, 5);
+
+			// Do patching 
+			*(UINT8*)Found = 0xE8;
+			*(UINT32*)(Found + 1) = UtilCalcRelativeCallOffset((VOID*)Found, (VOID*)&hkOslArchTransferToKernel);
+
+			// Display patched code 
+			//Print(L"Patched:\r\n");
+			//UtilDisassembleCode((UINT8*)Found, (VOID*)Found, 5);
+		}
+		else
+		{
+			Print(L"\r\nImgArchEfiStartBootApplication error, failed to find OslArchTransferToKernel patch location. Status: %lx\r\n", EfiStatus);
+		}
+	}
+
+	//UtilPrintLoadedImageInfo(gLocalImageInfo);
+
+	Print(L"Press any key to continue...");
+	UtilWaitForKey();
+
+	// Clear screen
+	//gST->ConOut->ClearScreen(gST->ConOut);
+
+	return oImgArchEfiStartBootApplication(AppEntry, ImageBase, ImageSize, BootOption, ReturnArguments);
+}*/
+
+__int64 __fastcall hkRtlImageNtHeaderEx(int a1, unsigned __int64 a2, unsigned __int64 a3, unsigned __int64 *a4)
+{
+	Print(L"base %lx\r\n", a2);
+	Print(L"size %lx\r\n", a3);
+
+	//UINT8* Found = NULL;;
+	CopyMem(ImgArchEfiStartBootApplicationPatchLocation, ImgArchEfiStartBootApplicationBackup, 5);
+
+	/*for (int i = 0; i < 5; i++)
+	{
+		UINT8 *Code = (UINT8*)(ImgArchEfiStartBootApplicationPatchLocation + i);
+
+		Print(L"printing restored: %lx\r\n", *(Code));
+	}
+
+	EFI_STATUS EfiStatus = UtilFindPattern(sigOslArchTransferToKernelCall, 0xCC, sizeof(sigOslArchTransferToKernelCall), (VOID*)a2, (UINT32)a3, (VOID**)&Found);
+	if (EfiStatus == EFI_SUCCESS)
+	{
+		Print(L"Found OslArchTransferToKernel call at %lx\r\n", Found);
+
+		// Get original from call instruction
+		oOslArchTransferToKernel = (tOslArchTransferToKernel)UtilCallAddress(Found);
+		Print(L"OslArchTransferToKernel at %lx\r\n", oOslArchTransferToKernel);
+		Print(L"OslArchTransferToKernelHook at %lx\r\n", &hkOslArchTransferToKernel);
+
+		// Backup original function bytes before patching
+		OslArchTransferToKernelCallPatchLocation = (VOID*)Found;
+		CopyMem((VOID*)OslArchTransferToKernelCallBackup, (VOID*)Found, 5);
+
+		// display original code
+		//Print(L"Original:\r\n");
+		//UtilDisassembleCode((UINT8*)Found, (VOID*)Found, 5);
+
+		// Do patching 
+		*(UINT8*)Found = 0xE8;
+		
+		*(UINT32*)(Found + 1) = UtilCalcRelativeCallOffset((VOID*)Found, (VOID*)&hkOslArchTransferToKernel);
+
+		// Display patched code 
+		//Print(L"Patched:\r\n");
+		//UtilDisassembleCode((UINT8*)Found, (VOID*)Found, 5);
+	}
+	else
+	{
+		Print(L"\r\nImgArchEfiStartBootApplication error, failed to find OslArchTransferToKernel patch location. Status: %lx\r\n", EfiStatus);
+	}
+
+	Print(L"call address aga9n %lx\r\n", oRtlImageNtHeaderEx);*/
+
+	return oRtlImageNtHeaderEx(a1, a2, a3, a4);
+}
+
+EFI_STATUS
+hkImageStart(
+	IN  EFI_HANDLE                  ImageHandle,
+	OUT UINTN                       *ExitDataSize,
+	OUT CHAR16                      **ExitData    OPTIONAL
+)
+{
+	Print(L"In image start\r\n");
+
+	UtilWaitForKey();
+
+	EFI_STATUS				Status;
+	EFI_LOADED_IMAGE_PROTOCOL		*Image;
+	CHAR16					*FilePathText = NULL;
+	//	CHAR16					*BootLoaders[] = BOOT_LOADERS;
+//	UINTN					Index;
+
+	Print(L"->StartImage(0x%lx, , )\n", ImageHandle);
+
+	//
+	// Get gEfiLoadedImageProtocolGuid for image that is starting
+	//
+	Status = gBS->OpenProtocol(
+		ImageHandle,
+		&gEfiLoadedImageProtocolGuid,
+		(VOID **)&Image,
+		gImageHandle,
+		NULL,
+		EFI_OPEN_PROTOCOL_GET_PROTOCOL
+	);
+	if (Status != EFI_SUCCESS) {
+		Print(L"ERROR: OStartImage: OpenProtocol(gEfiLoadedImageProtocolGuid) = %r\n", Status);
+		return EFI_INVALID_PARAMETER;
+	}
+
+	//
+	// Extract file path from image device file path
+	//
+	FilePathText = FileDevicePathToText(Image->FilePath);
+	if (FilePathText == NULL) {
+		Print(L"ERROR: OStartImage: image file path is NULL\n");
+		return EFI_INVALID_PARAMETER;
+	}
+	Print(L" File: %s\n", FilePathText);
+	Print(L" Image: %p - %x (%x)\n", Image->ImageBase, (UINTN)Image->ImageBase + Image->ImageSize, Image->ImageSize);
+	UtilWaitForKey();
+	Status = gBS->CloseProtocol(ImageHandle, &gEfiLoadedImageProtocolGuid, gImageHandle, NULL);
+	if (EFI_ERROR(Status)) {
+		Print(L"CloseProtocol error: %r\n", Status);
+	}
+	
+
+	
+	UINT8* Found = NULL;
+	EFI_STATUS EfiStatus = UtilFindPattern(
+		sigRtl,
+		0xCC,
+		sizeof(sigRtl),
+		Image->ImageBase,
+		(UINT32)Image->ImageSize,
+		(VOID**)&Found);
+	
+	if (!EFI_ERROR(EfiStatus))
+	{
+		// Found address, now let's do our patching
+		UINT32 NewCallRelative = 0;
+
+		Print(L"Found ImgArchEfiStartBootApplication call at %lx\n", Found);
+
+		// Save original call
+
+		UINT8 *orig = NULL;
+		UINT8 origSig[] = { 0x45, 0x33, 0xD2, 0x4D, 0x8B, 0xD8 };
+		UtilFindPattern(origSig, 0xCC, sizeof(origSig), Image->ImageBase, (UINT32)Image->ImageSize, (VOID**)&orig);
+		oRtlImageNtHeaderEx = (tRtlImageNtHeaderEx)orig;
+
+		Print(L"call address %lx\r\n", oRtlImageNtHeaderEx);
+		
+		// Backup original bytes and patch location before patching
+		ImgArchEfiStartBootApplicationPatchLocation = (VOID*)Found;
+
+		Print(L"Original address %lx\r\n", ImgArchEfiStartBootApplicationPatchLocation);
+		CopyMem(ImgArchEfiStartBootApplicationBackup, ImgArchEfiStartBootApplicationPatchLocation, 5);
+		// Patch call to jump to our hkImgArchEfiStartBootApplication hook
+		NewCallRelative = UtilCalcRelativeCallOffset((VOID*)Found, (VOID*)&hkRtlImageNtHeaderEx);
+		Print(L"offset %lx\r\n", NewCallRelative);
+		//Found
+		for (int i = 0; i < 5; i++)
+		{
+			UINT8 *Code = (UINT8*)(Found + i);
+
+			Print(L"printing old: %lx\r\n", *(Code));
+		}
+
+		*(UINT8*)Found = 0xE8; // Write call opcode
+		*(UINT32*)(Found + 1) = NewCallRelative; // Write the new relative call offset
+
+		for (int i = 0; i < 5; i++)
+		{
+			UINT8 *Code = (UINT8*)(Found + i);
+
+			Print(L"printing new: %lx\r\n", *(Code));
+		}
+
+		
+		Print(L"Done pathcingx\n");
+	}
+	else
+	{
+		Print(L"\r\nPatchWindowsBootManager error, failed to find Archpx64TransferTo64BitApplicationAsm patch location. Status: %lx\r\n", EfiStatus);
+	}
+
+	UtilWaitForKey();
+	//
+	// Start image by calling original StartImage
+	//
+	FreePool(FilePathText);
+	Status = g_pImageStart(ImageHandle, ExitDataSize, ExitData);
+
+	
+	
+	return Status;
+}
+
+
 
 EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 {
@@ -280,11 +621,71 @@ EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 		//UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\x33\xF6\x4C\x8B\xE1\x4C\x8B\xEA", "xxxxxxxx");
 		
 		// 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0xEB, 0xFE
-		// UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\xE8\xAA\xAA\xAA\xAA\x45\x33", "x????xx");
+		UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\xE8\xAA\xAA\xAA\xAA\x45\x33", "x????xx");
+		
+		UINT8 sigOslArchTransferToKernelCall123[] = { 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0x45, 0x33 }; // 48 8B 45 A8 33 FF
+		UINT8* Found = NULL;
+
+		EFI_STATUS stat = UtilFindPattern(sigOslArchTransferToKernelCall123, 0xCC, sizeof(sigOslArchTransferToKernelCall123), Base, pHeaders->OptionalHeader.SizeOfImage, (VOID**)&Found);
+		if (stat == EFI_SUCCESS)
+		{
+			Print(L"Found OslArchTransferToKernel call at %lx\r\n", Found);
+		}
+
+		if (p)
+		{
+			Print(L"Found OslArchTransferToKernel call at %lx\r\n", p);
+		}
+
+		oOslArchTransferToKernel = (tOslArchTransferToKernel)UtilCallAddress(Found);
+		Print(L"OslArchTransferToKernel at %lx\r\n", oOslArchTransferToKernel);
+		Print(L"OslArchTransferToKernelHook at %lx\r\n", &hkOslArchTransferToKernel);
+
+		OslArchTransferToKernelCallPatchLocation = (VOID*)Found;
+		CopyMem((VOID*)OslArchTransferToKernelCallBackup, (VOID*)Found, 5);
+
+		// Do patching 
+		*(UINT8*)Found = 0xE8;
+		*(UINT32*)(Found + 1) = UtilCalcRelativeCallOffset((VOID*)Found, (VOID*)&hkOslArchTransferToKernel);
+
+		UINT8 sigBlock[] = { 0x48, 0x8B, 0x3D, 0xCC, 0xCC, 0xCC, 0xCC, 0x48, 0x8B, 0xCF }; // 48 8B 45 A8 33 FF
+		UINT8* Found2 = NULL;
+
+		EFI_STATUS stat2 = UtilFindPattern(sigBlock, 0xCC, sizeof(sigBlock), Base, pHeaders->OptionalHeader.SizeOfImage, (VOID**)&Found2);
+		if (stat2 == EFI_SUCCESS)
+		{
+			UINT64 ldrblk = (*(UINT32*)(Found2 + 3));
+			Print(L"Here %lx\r\n", ldrblk);
+			//UtilWaitForKey();
+
+
+			
+			//Print(L"Found blk call at %lx\r\n", *(UINT32*)(Found2 + 3));
+			PLOADER_PARAMETER_BLOCK blk2 = NULL;
+			blk2 = (PLOADER_PARAMETER_BLOCK)&ldrblk;
+			Print(L"%s\r\n", blk2->NtBootPathName);
+
+			Print(L"%s\r\n", blk2->Extension->EfiVersion.Buffer);
+			Print(L"%lx\r\n", blk2->OsMajorVersion);
+			Print(L"%lx\r\n", blk2->RegistryLength);
+
+			PKLDR_DATA_TABLE_ENTRY KernelEntry = GetLoadedModule(&blk2->LoadOrderListHead, L"ntoskrnl.exe");
+			if (KernelEntry)
+			{
+				Print(L"got it %lx", KernelEntry->DllBase);
+				//KernelBase = KernelEntry->ImageBase;
+				Print(L"Size %lx\r\n", KernelEntry->SizeOfImage);
+				//KernelSize = KernelEntry->SizeOfImage;
+			}
+
+			
+		}
 
 		//\x48\x8B\x3D\x00\x00\x00\x00\x48\x8B\xCF xxx????xxx
 		
 	}
+
+
 
 	/*
 	UINTN MemoryMapSize;
@@ -315,6 +716,29 @@ EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 	return g_pOrgExitBootService(ImageHandle, MapKey);
 }
 
+/*VOID
+EFIAPI
+Callback2(
+	IN  EFI_EVENT	Event,
+	IN  VOID      *Context
+)
+{
+	Print(L"in callbak2\n\r");
+
+	UINT8 *p = UtilFindPattern2(Base, pHeaders->OptionalHeader.SizeOfImage, "\xE8\xAA\xAA\xAA\xAA\x45\x33", "x????xx");
+	oOslArchTransferToKernel = (tOslArchTransferToKernel)UtilCallAddress(p);
+	Print(L"OslArchTransferToKernel at %lx\r\n", oOslArchTransferToKernel);
+	Print(L"OslArchTransferToKernelHook at %lx\r\n", &hkOslArchTransferToKernel);
+
+	// Backup original function bytes before patching
+	OslArchTransferToKernelCallPatchLocation = (VOID*)p;
+	CopyMem((VOID*)OslArchTransferToKernelCallBackup, (VOID*)p, 5);
+
+	*(UINT8*)p = 0xE8;
+	*(UINT32*)(p + 1) = UtilCalcRelativeCallOffset((VOID*)p, (VOID*)&hkOslArchTransferToKernel);
+}*/
+
+
 EFI_STATUS
 EFIAPI
 UefiMain (
@@ -335,11 +759,22 @@ UefiMain (
                                                          &gComponentNameProtocol,
                                                          &gComponentName2Protocol);
 
-	EFI_EVENT Event;
-	gBootServices->CreateEventEx(0x200, 0x10, &CallbackSMI, NULL, &EXIT_BOOT_SERVICES_GUID, &Event);
-	g_pOrgExitBootService = gBS->ExitBootServices;
+	//EFI_EVENT Event;
+	//gBootServices->CreateEventEx(0x200, 0x10, &CallbackSMI, NULL, &EXIT_BOOT_SERVICES_GUID, &Event);
+	//gBootServices->CreateEventEx(0x200, 0x10, &Callback2, NULL, &SMBIOS_TABLE_GUID, &Event);
+	//gBootServices->CreateEventEx(0x200, 0x10, &Callback2, NULL, &CC, &Event);
+	//g_pOrgExitBootService = gBS->ExitBootServices;
 
-	gBS->ExitBootServices = _ExitBootServices;
+	//g_pImageLoad = gBS->LoadImage;
+
+	g_pImageStart = gBS->StartImage;
+
+	gBS->StartImage = hkImageStart;
+	//gBS->
+
+	//gBS->ExitBootServices = _ExitBootServices;
+
+	//gBS->LoadImage = _LoadImage;
 
 	//if (enableHooks) eBs->ExitBootServices = ItSecExitBootServices;
 

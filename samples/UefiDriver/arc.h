@@ -1,100 +1,27 @@
 #pragma once
+#include "wintypes.h"
+typedef ULONG ARC_STATUS;
 
-//
-// Bullshit thats not defined in EFI library
-//
-typedef union _LARGE_INTEGER
-{
-	struct
-	{
-		UINT32 LowPart;
-		INT32 HighPart;
-	} v;
-	struct
-	{
-		UINT32 LowPart;
-		INT32 HighPart;
-	} u;
-	UINT64 QuadPart;
-} LARGE_INTEGER;
-
-typedef union _ULARGE_INTEGER
-{
-	struct
-	{
-		UINT32 LowPart;
-		UINT32 HighPart;
-	} v;
-	struct
-	{
-		UINT32 LowPart;
-		UINT32 HighPart;
-	} u;
-	UINT64 QuadPart;
-} ULARGE_INTEGER;
-
-typedef struct _UNICODE_STRING
-{
-	UINT16 Length;
-	UINT16 MaximumLength;
-	CHAR16*   Buffer;
-} UNICODE_STRING;
-
-//
-// Calculate the address of the base of the structure given its type, and an
-// address of a field within the structure.
-//
-#define CONTAINING_RECORD(address, type, field) ((type *)((CHAR8*)(address) - (UINT64)(&((type *)0)->field)))
-
-typedef struct _KLDR_DATA_TABLE_ENTRY
-{
-	struct _LIST_ENTRY InLoadOrderLinks; // 0x0
-	VOID* ExceptionTable; // 0x10
-	UINT32 ExceptionTableSize; // 0x18
-							   // ULONG padding on IA64
-	VOID* GpValue; // 0x20
-	VOID* NonPagedDebugInfo; // 0x28
-	VOID* ImageBase; // 0x30
-	VOID* EntryPoint; // 0x38
-	UINT32 SizeOfImage; // 0x40
-	struct _UNICODE_STRING FullImageName; // 0x48
-	struct _UNICODE_STRING BaseImageName; // 0x58
-	UINT32 Flags; // 0x68
-	UINT16 LoadCount; // 0x6C
-	UINT16 u1; // 0x6E
-	VOID* SectionPointer; // 0x70
-	UINT32 CheckSum; // 0x78
-	UINT32 CoverageSectionSize; // 0x7C
-	VOID* CoverageSection; // 0x80
-	VOID* LoadedImports; // 0x88
-	VOID* Spare; // 0x90
-	UINT32 SizeOfImageNotRounded; // 0x98
-	UINT32 TimeDateStamp; // 0x9C
-} KLDR_DATA_TABLE_ENTRY, *PKLDR_DATA_TABLE_ENTRY;
-
-//
-// Define DEVICE_FLAGS
-//
-
-typedef struct _DEVICE_FLAGS
-{
-	UINT32 Failed : 1;
-	UINT32 ReadOnly : 1;
-	UINT32 Removable : 1;
-	UINT32 ConsoleIn : 1;
-	UINT32 ConsoleOut : 1;
-	UINT32 Input : 1;
-	UINT32 Output : 1;
-} DEVICE_FLAGS, *PDEVICE_FLAGS;
-
+// begin_ntddk
 //
 // Define configuration routine types.
 //
 // Configuration information.
 //
+// end_ntddk
+#pragma warning(disable : 4201)
+typedef struct _PROFILE_PARAMETER_BLOCK {
 
-typedef enum _CONFIGURATION_TYPE
-{
+	USHORT  Status;
+	USHORT  Reserved;
+	USHORT  DockingState;
+	USHORT  Capabilities;
+	ULONG   DockID;
+	ULONG   SerialNumber;
+
+} PROFILE_PARAMETER_BLOCK;
+
+typedef enum _CONFIGURATION_TYPE {
 	ArcSystem,
 	CentralProcessor,
 	FloatingPointProcessor,
@@ -139,8 +66,7 @@ typedef enum _CONFIGURATION_TYPE
 	MaximumType
 } CONFIGURATION_TYPE, *PCONFIGURATION_TYPE;
 
-typedef enum _CONFIGURATION_CLASS
-{
+typedef enum _CONFIGURATION_CLASS {
 	SystemClass,
 	ProcessorClass,
 	CacheClass,
@@ -151,232 +77,187 @@ typedef enum _CONFIGURATION_CLASS
 	MaximumClass
 } CONFIGURATION_CLASS, *PCONFIGURATION_CLASS;
 
-typedef struct _CONFIGURATION_COMPONENT
-{
+typedef struct _CONFIGURATION_COMPONENT {
 	CONFIGURATION_CLASS Class;
 	CONFIGURATION_TYPE Type;
-	DEVICE_FLAGS Flags;
-	UINT16 Version;
-	UINT16 Revision;
-	UINT32 Key;
-	union
-	{
-		UINT32 AffinityMask;
-		struct
-		{
-			UINT16 Group;
-			UINT16 GroupIndex;
-		} u;
-	} v;
-	UINT32 ConfigurationDataLength;
-	UINT32 IdentifierLength;
-	INT8* Identifier;
-} CONFIGURATION_COMPONENT, *PCONFIGURATION_COMPONENT;
+	ULONG Flags;
+	USHORT Version;
+	USHORT Revision;
+	ULONG Key;
+	union {
+		ULONG AffinityMask;
+		struct {
+			USHORT Group;
+			USHORT GroupIndex;
+		};
+	};
+	ULONG ConfigurationDataLength;
+	ULONG IdentifierLength;
+	CHAR * Identifier;
+} CONFIGURATION_COMPONENT;
+
+typedef union _LARGE_INTEGER {
+	struct {
+		DWORD LowPart;
+		LONG  HighPart;
+	};
+	struct {
+		DWORD LowPart;
+		LONG  HighPart;
+	} u;
+	LONGLONG QuadPart;
+} LARGE_INTEGER, *PLARGE_INTEGER;
 
 //
 // Define configuration data structure used in all systems.
 //
-typedef struct _CONFIGURATION_COMPONENT_DATA
-{
+
+typedef struct _CONFIGURATION_COMPONENT_DATA {
 	struct _CONFIGURATION_COMPONENT_DATA *Parent;
 	struct _CONFIGURATION_COMPONENT_DATA *Child;
 	struct _CONFIGURATION_COMPONENT_DATA *Sibling;
 	CONFIGURATION_COMPONENT ComponentEntry;
-	VOID* ConfigurationData;
+	PVOID ConfigurationData;
 } CONFIGURATION_COMPONENT_DATA, *PCONFIGURATION_COMPONENT_DATA;
 
 
+//
+// Define memory allocation structures used in all systems.
+//
 
-typedef struct _NLS_DATA_BLOCK
-{
-	VOID* AnsiCodePageData;
-	VOID* OemCodePageData;
-	VOID* UnicodeCaseTableData;
+typedef enum _TYPE_OF_MEMORY {
+	LoaderExceptionBlock,                                   //  0
+	LoaderSystemBlock,                                      //  1
+	LoaderFree,                                             //  2
+	LoaderBad,                                              //  3
+	LoaderLoadedProgram,                                    //  4
+	LoaderFirmwareTemporary,                                //  5
+	LoaderFirmwarePermanent,                                //  6
+	LoaderOsloaderHeap,                                     //  7
+	LoaderOsloaderStack,                                    //  8
+	LoaderSystemCode,                                       //  9
+	LoaderHalCode,                                          //  a
+	LoaderBootDriver,                                       //  b
+	LoaderConsoleInDriver,                                  //  c
+	LoaderConsoleOutDriver,                                 //  d
+	LoaderStartupDpcStack,                                  //  e
+	LoaderStartupKernelStack,                               //  f
+	LoaderStartupPanicStack,                                // 10
+	LoaderStartupPcrPage,                                   // 11
+	LoaderStartupPdrPage,                                   // 12
+	LoaderRegistryData,                                     // 13
+	LoaderMemoryData,                                       // 14
+	LoaderNlsData,                                          // 15
+	LoaderSpecialMemory,                                    // 16
+	LoaderBBTMemory,                                        // 17
+	LoaderZero,                                             // 18
+	LoaderXIPRom,                                           // 19
+	LoaderHALCachedMemory,                                  // 1a
+	LoaderLargePageFiller,                                  // 1b
+	LoaderErrorLogMemory,                                   // 1c
+	LoaderVsmMemory,                                        // 1d
+	LoaderFirmwareCode,                                     // 1e
+	LoaderFirmwareData,                                     // 1f
+	LoaderFirmwareReserved,                                 // 20
+	LoaderMaximum                                           // 21
+} TYPE_OF_MEMORY;
+
+typedef struct _MEMORY_ALLOCATION_DESCRIPTOR {
+	LIST_ENTRY ListEntry;
+	TYPE_OF_MEMORY MemoryType;
+	ULONG_PTR BasePage;
+	ULONG_PTR PageCount;
+} MEMORY_ALLOCATION_DESCRIPTOR, *PMEMORY_ALLOCATION_DESCRIPTOR;
+
+//
+// Define loader parameter block structure.
+//
+
+#define ANYSIZE_ARRAY 1
+
+typedef struct _LSA_UNICODE_STRING {
+	USHORT Length;
+	USHORT MaximumLength;
+	PWSTR  Buffer;
+} LSA_UNICODE_STRING, *PLSA_UNICODE_STRING, UNICODE_STRING, *PUNICODE_STRING;
+
+typedef struct _NLS_DATA_BLOCK {
+	PVOID AnsiCodePageData;
+	PVOID OemCodePageData;
+	PVOID UnicodeCaseTableData;
 } NLS_DATA_BLOCK, *PNLS_DATA_BLOCK;
 
-typedef struct _VHD_DISK_SIGNATURE
-{
-	UINT32 ParentPartitionNumber;
-	UINT8 BootDevice[1];
+typedef struct _VHD_DISK_SIGNATURE {
+	ULONG ParentPartitionNumber;
+	UCHAR BootDevice[ANYSIZE_ARRAY];
 } VHD_DISK_SIGNATURE, *PVHD_DISK_SIGNATURE;
 
-typedef struct _ARC_DISK_SIGNATURE
-{
+typedef struct _ARC_DISK_SIGNATURE {
 	LIST_ENTRY ListEntry;
-	UINT32   Signature;
-	CHAR8*   ArcName;
-	UINT32   CheckSum;
+	ULONG   Signature;
+	PCHAR   ArcName;
+	ULONG   CheckSum;
 	BOOLEAN ValidPartitionTable;
 	BOOLEAN xInt13;
 	BOOLEAN IsGpt;
-	UINT8 Reserved;
-	UINT8 GptSignature[16];
+	UCHAR Reserved;
+	UCHAR GptSignature[16];
 	PVHD_DISK_SIGNATURE VhdSignature;
 } ARC_DISK_SIGNATURE, *PARC_DISK_SIGNATURE;
 
-typedef struct _ARC_DISK_INFORMATION
-{
+typedef struct _ARC_DISK_INFORMATION {
 	LIST_ENTRY DiskSignatures;
 } ARC_DISK_INFORMATION, *PARC_DISK_INFORMATION;
 
-typedef struct _I386_LOADER_BLOCK
-{
-	VOID* CommonDataArea;
-	UINT32 MachineType;      // Temporary only
-	UINT32 VirtualBias;
-} I386_LOADER_BLOCK, *PI386_LOADER_BLOCK;
+typedef struct _I386_LOADER_BLOCK {
 
-typedef struct _ARM_LOADER_BLOCK
-{
-	UINT64 VirtualBias;
-	VOID* KdCpuBuffer;
-} ARM_LOADER_BLOCK, *PARM_LOADER_BLOCK;
+#if defined(_X86_) || defined(_AMD64_)
 
-typedef struct _VIRTUAL_EFI_RUNTIME_SERVICES
-{
-	//
-	//  (Virtual) Entry points to each of the EFI Runtime services.
-	//
-	EFI_GET_TIME GetTime;
-	EFI_SET_TIME SetTime;
-	EFI_GET_WAKEUP_TIME GetWakeupTime;
-	EFI_SET_WAKEUP_TIME SetWakeupTime;
-	EFI_SET_VIRTUAL_ADDRESS_MAP SetVirtualAddressMap;
-	EFI_CONVERT_POINTER ConvertPointer;
-	EFI_GET_VARIABLE GetVariable;
-	EFI_GET_NEXT_VARIABLE_NAME GetNextVariableName;
-	EFI_SET_VARIABLE SetVariable;
-	EFI_GET_NEXT_HIGH_MONO_COUNT GetNextHighMonotonicCount;
-	EFI_RESET_SYSTEM ResetSystem;
-	EFI_UPDATE_CAPSULE UpdateCapsule;
-	EFI_QUERY_CAPSULE_CAPABILITIES QueryCapsuleCapabilities;
-	EFI_QUERY_VARIABLE_INFO QueryVariableInfo;
-} VIRTUAL_EFI_RUNTIME_SERVICES, *PVIRTUAL_EFI_RUNTIME_SERVICES;
+	PVOID CommonDataArea;
+	ULONG MachineType;      // Temporary only
+	ULONG VirtualBias;
 
-typedef struct _EFI_FIRMWARE_INFORMATION
-{
-	UINT32 FirmwareVersion;
-	PVIRTUAL_EFI_RUNTIME_SERVICES VirtualEfiRuntimeServices;
-
-	//
-	// The return value from SetVirtualAddressMap call.
-	//
-	EFI_STATUS SetVirtualAddressMapStatus;
-
-	//
-	// Number of mappings missed if any due to change in firmware
-	// runtime memory map (for debugging).
-	//
-	UINT32 MissedMappingsCount;
-
-	//
-	// The firmware resource list identifies firmware components that can
-	// be updated via WU.
-	//
-	LIST_ENTRY FirmwareResourceList;
-
-	//
-	// The EFI memory map.
-	//
-	VOID* EfiMemoryMap;
-	UINT32 EfiMemoryMapSize;
-	UINT32 EfiMemoryMapDescriptorSize;
-
-} EFI_FIRMWARE_INFORMATION, *PEFI_FIRMWARE_INFORMATION;
-
-typedef struct _PCAT_FIRMWARE_INFORMATION
-{
-	UINT32 PlaceHolder;
-} PCAT_FIRMWARE_INFORMATION, *PPCAT_FIRMWARE_INFORMATION;
-
-typedef struct _FIRMWARE_INFORMATION_LOADER_BLOCK
-{
-	struct
-	{
-		//
-		// If set to TRUE, indicates that the system is running on EFI firmware.
-		//
-		UINT32 FirmwareTypeEfi : 1;
-
-		//
-		// A flag indicating whether EFI runtime service calls must be routed through IUM.
-		//
-		UINT32 EfiRuntimeUseIum : 1;
-
-		//
-		// A flag indicating whether EFI runtime code and data pages are
-		// separate and protected with RW or RX protections.
-		//
-		UINT32 EfiRuntimePageProtectionEnabled : 1;
-
-		//
-		// A flag indicating whether the firmware supports code and data page
-		// separation with restricted protections.
-		//
-		UINT32 EfiRuntimePageProtectionSupported : 1;
-
-#if defined (_ARM64_) || defined(_WIN64)
-		//
-		// If set to TRUE, indicates that the system EFI was started in EL2
-		// and therefore has something running there (hypervisor/microvisor).
-		// Also, this is where APs will start (EL2), and need to be directed
-		// to EL1 properly before they can start in the HLOS.
-		//
-		UINT32 FirmwareStartedInEL2 : 1;
-		UINT32 Reserved : 27;
 #else
-		UINT32 Reserved : 28;
+
+	ULONG PlaceHolder;
+
 #endif
 
-	} v;
+} I386_LOADER_BLOCK, *PI386_LOADER_BLOCK;
 
-	union
-	{
-		EFI_FIRMWARE_INFORMATION EfiInformation;
-		PCAT_FIRMWARE_INFORMATION PcatInformation;
-	} u;
+typedef struct _ARM_LOADER_BLOCK {
 
-} FIRMWARE_INFORMATION_LOADER_BLOCK, *PFIRMWARE_INFORMATION_LOADER_BLOCK;
+#if defined(_ARM_) || defined(_ARM64_)
 
-//
-// Internal boot flags definitions.
-//
-#define INTERNAL_BOOT_FLAGS_NONE               0x00000000
-#define INTERNAL_BOOT_FLAGS_UTC_BOOT_TIME      0x00000001
-#define INTERNAL_BOOT_FLAGS_RTC_BOOT_TIME      0x00000002
-#define INTERNAL_BOOT_FLAGS_NO_LEGACY_SERVICES 0x00000004
+	ULONG_PTR VirtualBias;
+	PVOID KdCpuBuffer;
 
-typedef struct _PROFILE_PARAMETER_BLOCK
-{
-	UINT16  Status;
-	UINT16  Reserved;
-	UINT16  DockingState;
-	UINT16  Capabilities;
-	UINT32   DockID;
-	UINT32   SerialNumber;
-} PROFILE_PARAMETER_BLOCK;
+#else
 
-typedef struct _LOADER_PERFORMANCE_DATA
-{
-	UINT64 StartTime;
-	UINT64 EndTime;
+	ULONG PlaceHolder;
+
+#endif
+
+} ARM_LOADER_BLOCK, *PARM_LOADER_BLOCK;
+
+#define NUMBER_OF_LOADER_TR_ENTRIES 8
+
+typedef struct _LOADER_PERFORMANCE_DATA {
+	ULONGLONG StartTime;
+	ULONGLONG EndTime;
 } LOADER_PERFORMANCE_DATA, *PLOADER_PERFORMANCE_DATA;
 
-//
-// The SORTPP tool can't handle array sizes expressed in terms of enums
-// This hack can be removed when the tool is fixed
-//
-#define BOOT_ENTROPY_SOURCE_DATA_SIZE    (64)
-#define BOOT_RNG_BYTES_FOR_NTOSKRNL      (1024)
-#define BOOT_SEED_BYTES_FOR_CNG          (48)
+#if !defined(BOOT_ENTROPY_RESULT_CODE_D)
+
+#define BOOT_ENTROPY_RESULT_CODE_D
 
 //
 // Entropy result codes and source IDs
 // for Boot entropy sources are defined both in arc.h and
 // ntexapi.h. These two copies must be kept identical.
 //
-typedef enum _BOOT_ENTROPY_SOURCE_RESULT_CODE
-{
+
+typedef enum _BOOT_ENTROPY_SOURCE_RESULT_CODE {
 	BootEntropySourceStructureUninitialized = 0,
 	BootEntropySourceDisabledByPolicy = 1,
 	BootEntropySourceNotPresent = 2,
@@ -384,8 +265,7 @@ typedef enum _BOOT_ENTROPY_SOURCE_RESULT_CODE
 	BootEntropySourceSuccess = 4,
 } BOOT_ENTROPY_SOURCE_RESULT_CODE, *PBOOT_ENTROPY_SOURCE_RESULT_CODE;
 
-typedef enum _BOOT_ENTROPY_SOURCE_ID
-{
+typedef enum _BOOT_ENTROPY_SOURCE_ID {
 	BootEntropySourceNone = 0,
 	BootEntropySourceSeedfile = 1,
 	BootEntropySourceExternal = 2,
@@ -399,6 +279,27 @@ typedef enum _BOOT_ENTROPY_SOURCE_ID
 } BOOT_ENTROPY_SOURCE_ID;
 
 //
+// The SORTPP tool can't handle array sizes expressed in terms of enums
+// This hack can be removed when the tool is fixed
+//
+
+#define BootMaxEntropySources (8)
+
+#define BOOT_ENTROPY_SOURCE_DATA_SIZE    (64)
+#define BOOT_RNG_BYTES_FOR_NTOSKRNL      (1024)
+#define BOOT_SEED_BYTES_FOR_CNG          (48)
+
+//
+// The boot environment uses the following bytes from the ntoskrnl RNG data
+// region.  The kernel should consider the first
+// BOOT_BL_NTOSKRNL_RNG_BYTES_USED bytes already consumed.
+//
+
+#define BOOT_BL_NTOSKRNL_RNG_BYTES_USED  (55 * sizeof(ULONG))
+
+#endif // BOOT_ENTROPY_RESULT_CODE_D
+
+//
 // Boot entropy information
 // This is the data that Boot passes to NT that contains the
 // entropy & RNG information.
@@ -407,16 +308,50 @@ typedef enum _BOOT_ENTROPY_SOURCE_ID
 // OS loader equivalents in ntexapi_h.w
 //
 
-typedef struct _BOOT_ENTROPY_SOURCE_LDR_RESULT
-{
+typedef struct _BOOT_ENTROPY_SOURCE_LDR_RESULT {
 	BOOT_ENTROPY_SOURCE_ID SourceId;
-	UINT64 Policy;
+	ULONGLONG Policy;
 	BOOT_ENTROPY_SOURCE_RESULT_CODE ResultCode;
-	EFI_STATUS ResultStatus;
-	UINT64 Time; // in BlArchGetPerformanceCounter() units
-	UINT32 EntropyLength;
-	UINT8 EntropyData[BOOT_ENTROPY_SOURCE_DATA_SIZE];
+	NTSTATUS ResultStatus;
+	ULONGLONG Time; // in BlArchGetPerformanceCounter() units
+	ULONG EntropyLength;
+	UCHAR EntropyData[BOOT_ENTROPY_SOURCE_DATA_SIZE];
 } BOOT_ENTROPY_SOURCE_LDR_RESULT, *PBOOT_ENTROPY_SOURCE_LDR_RESULT;
+
+//
+// EFI Offline crashdump configuration table definition.
+//
+
+#define OFFLINE_CRASHDUMP_VERSION_1 1
+#define OFFLINE_CRASHDUMP_VERSION_2 2
+#define OFFLINE_CRASHDUMP_VERSION_MAX OFFLINE_CRASHDUMP_VERSION_2
+
+typedef struct _OFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V2 {
+	ULONG Version;
+	ULONG AbnormalResetOccurred;
+	ULONG OfflineMemoryDumpCapable;
+
+	//
+	// Version_2 additional members.
+	//
+
+	PHYSICAL_ADDRESS ResetDataAddress;
+	ULONG ResetDataSize;
+} OFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V2, *POFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V2;
+
+//
+// Original first version definition. Now only used in winload.efi when interfacing with firmware, and in
+// sysinfo.c when interfacing with higher level sw above the kernel, to maintain backward compatibility.
+//
+
+typedef struct _OFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V1 {
+	ULONG Version;
+	ULONG AbnormalResetOccurred;
+	ULONG OfflineMemoryDumpCapable;
+} OFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V1, *POFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V1;
+
+typedef OFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V2 OFFLINE_CRASHDUMP_CONFIGURATION_TABLE;
+typedef POFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V2 POFFLINE_CRASHDUMP_CONFIGURATION_TABLE;
 
 //
 // The constant BootMaxEntropySources is defined both in arc.w and ntexapi_h.w.
@@ -425,177 +360,172 @@ typedef struct _BOOT_ENTROPY_SOURCE_LDR_RESULT
 // To help detect this type of bug we add a field with this constant so that the
 // CHKed builds can assert on it.
 //
-typedef struct _BOOT_ENTROPY_LDR_RESULT
-{
-	UINT32 maxEntropySources;
+
+typedef struct _BOOT_ENTROPY_LDR_RESULT {
+	ULONG maxEntropySources;
 	BOOT_ENTROPY_SOURCE_LDR_RESULT EntropySourceResult[BootMaxEntropySources];
-	UINT8 SeedBytesForCng[BOOT_SEED_BYTES_FOR_CNG];
-	UINT8 RngBytesForNtoskrnl[BOOT_RNG_BYTES_FOR_NTOSKRNL];
+	UCHAR SeedBytesForCng[BOOT_SEED_BYTES_FOR_CNG];
+	UCHAR RngBytesForNtoskrnl[BOOT_RNG_BYTES_FOR_NTOSKRNL];
 } BOOT_ENTROPY_LDR_RESULT, *PBOOT_ENTROPY_LDR_RESULT;
 
 //
 // Hypervisor specific loader parameters.
 //
-typedef struct _LOADER_PARAMETER_HYPERVISOR_EXTENSION
-{
+
+typedef struct _LOADER_PARAMETER_HYPERVISOR_EXTENSION {
+
 	//
 	// Hypervisor crashdump pages if present.
 	//
-	UINT32 HypervisorCrashdumpAreaPageCount;
-	UINT64 HypervisorCrashdumpAreaSpa;
+
+	ULONG HypervisorCrashdumpAreaPageCount;
+	ULONGLONG HypervisorCrashdumpAreaSpa;
+
 	//
 	// Hypervisor launch status.
 	//
-	UINT64 HypervisorLaunchStatus;
-	UINT64 HypervisorLaunchStatusArg1;
-	UINT64 HypervisorLaunchStatusArg2;
-	UINT64 HypervisorLaunchStatusArg3;
-	UINT64 HypervisorLaunchStatusArg4;
+
+	ULONGLONG HypervisorLaunchStatus;
+	ULONGLONG HypervisorLaunchStatusArg1;
+	ULONGLONG HypervisorLaunchStatusArg2;
+	ULONGLONG HypervisorLaunchStatusArg3;
+	ULONGLONG HypervisorLaunchStatusArg4;
+
 } LOADER_PARAMETER_HYPERVISOR_EXTENSION, *PLOADER_PARAMETER_HYPERVISOR_EXTENSION;
-
-typedef struct _LOADER_BUGCHECK_PARAMETERS
-{
-	//
-	// Bugcheck parameters passed to the kernel.
-	//
-	UINT32 BugcheckCode;
-	UINT64 BugcheckParameter1;
-	UINT64 BugcheckParameter2;
-	UINT64 BugcheckParameter3;
-	UINT64 BugcheckParameter4;
-} LOADER_BUGCHECK_PARAMETERS, *PLOADER_BUGCHECK_PARAMETERS;
-
-//
-// EFI Offline crashdump configuration table definition.
-//
-#define OFFLINE_CRASHDUMP_VERSION_1 1
-#define OFFLINE_CRASHDUMP_VERSION_2 2
-#define OFFLINE_CRASHDUMP_VERSION_MAX OFFLINE_CRASHDUMP_VERSION_2
-
-typedef struct _OFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V2
-{
-	UINT32 Version;
-	UINT32 AbnormalResetOccurred;
-	UINT32 OfflineMemoryDumpCapable;
-	//
-	// Version_2 additional members.
-	//
-	PHYSICAL_ADDRESS ResetDataAddress;
-	UINT32 ResetDataSize;
-} OFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V2, *POFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V2;
-
-//
-// Original first version definition. Now only used in winload.efi when interfacing with firmware, and in
-// sysinfo.c when interfacing with higher level sw above the kernel, to maintain backward compatibility.
-//
-typedef struct _OFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V1
-{
-	UINT32 Version;
-	UINT32 AbnormalResetOccurred;
-	UINT32 OfflineMemoryDumpCapable;
-} OFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V1, *POFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V1;
-
-typedef OFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V2 OFFLINE_CRASHDUMP_CONFIGURATION_TABLE;
-typedef POFFLINE_CRASHDUMP_CONFIGURATION_TABLE_V2 POFFLINE_CRASHDUMP_CONFIGURATION_TABLE;
 
 //
 // Code Integrity specific loader paramets.
 //
-typedef struct _LOADER_PARAMETER_CI_EXTENSION
-{
+
+typedef struct _LOADER_PARAMETER_CI_EXTENSION {
+
 	//
 	// Offset and size of various serialized data.
 	//
-	UINT32 RevocationListOffset;
-	UINT32 RevocationListSize;
-	UINT8 SerializedData[1];
+
+	ULONG RevocationListOffset;
+	ULONG RevocationListSize;
+
+
+	UCHAR SerializedData[ANYSIZE_ARRAY];
+
 } LOADER_PARAMETER_CI_EXTENSION, *PLOADER_PARAMETER_CI_EXTENSION;
 
-typedef struct _LOADER_HIVE_RECOVERY_INFO
-{
-	struct
-	{
-		//
-		// 1 if the hive was recovered by the boot loader, 0 otherwise.
-		//
-		UINT32 Recovered : 1;
-		//
-		// 1 if recovery from a legacy log file was performed, 0 otherwise.
-		//
-		UINT32 LegacyRecovery : 1;
-		//
-		// 1 if this hive was loaded as part of a soft reboot and encountered
-		// a sharing violation during the load (causing it to be loaded from
-		// a copy). 0 otherwise.
-		//
-		UINT32 SoftRebootConflict : 1;
-		//
-		// The most recent log from which recovery was performed as an 
-		// HFILE_TYPE.
-		//
-		//      i.e. For legacy recovery the individual log file recovery was
-		//           performed from, otherwise the log from which the highest
-		//           sequence numbered entry was from.
-		//
-		UINT32 MostRecentLog : 3;
-		UINT32 Spare : ((sizeof(UINT32) * 8) - 5);
-	} w;
+typedef struct _HAL_EXTENSION_INSTANCE_ENTRY {
 
 	//
-	// The sequence number that should be used for the next log entry.
+	// Link into HalExtensionInstanceList in HAL_EXTENSION_MODULE_ENTRY.
 	//
-	UINT32 LogNextSequence;
-	//
-	// The minimum sequence number in the most recent log.
-	//
-	UINT32 LogMinimumSequence;
-	//
-	// The file offset at which the next log entry should be written in the
-	// most recent log.
-	//
-	UINT32 LogCurrentOffset;
-} LOADER_HIVE_RECOVERY_INFO, *PLOADER_HIVE_RECOVERY_INFO;
 
-typedef struct _LOADER_PARAMETER_EXTENSION
-{
-	UINT32   Size; // set to sizeof (struct _LOADER_PARAMETER_EXTENSION)
+	LIST_ENTRY ListEntry;
+
+	//
+	// Offset from the start of the ACPI Core System Resource Table to
+	// the Resource Group associate with this instance.
+	//
+
+	ULONG OffsetIntoCsrt;
+} HAL_EXTENSION_INSTANCE_ENTRY, *PHAL_EXTENSION_INSTANCE_ENTRY;
+
+typedef struct _HAL_EXTENSION_MODULE_ENTRY {
+
+	//
+	// Link into HalExtensionList in LOADER_PARAMETER_EXTENSION.
+	//
+
+	LIST_ENTRY ListEntry;
+
+	//
+	// Pointer to the associated module entry on the LoadOrderListHead list.
+	// This keeps info on the module name and entry point, among other things.
+	//
+
+	PVOID HalExtensionInfo;
+
+	//
+	// List of HAL_EXTENSION_INSTANCE_ENTRY structures tracking which Resource
+	// Groups this extension is installed on.
+	//
+
+	LIST_ENTRY HalExtensionInstanceList;
+
+	//
+	// Name and load status of the HAL Extension for debugging purposes.
+	//
+
+	NTSTATUS ModuleLoadStatus;
+	PCHAR ModuleName;
+	PCHAR ModulePath;
+
+} HAL_EXTENSION_MODULE_ENTRY, *PHAL_EXTENSION_MODULE_ENTRY;
+
+typedef struct _LOADER_BUGCHECK_PARAMETERS {
+
+	//
+	// Bugcheck parameters passed to the kernel.
+	//
+
+	ULONG BugcheckCode;
+	ULONG_PTR BugcheckParameter1;
+	ULONG_PTR BugcheckParameter2;
+	ULONG_PTR BugcheckParameter3;
+	ULONG_PTR BugcheckParameter4;
+} LOADER_BUGCHECK_PARAMETERS, *PLOADER_BUGCHECK_PARAMETERS;
+
+//
+// Internal boot flags definitions.
+//
+
+#define INTERNAL_BOOT_FLAGS_NONE               0x00000000
+#define INTERNAL_BOOT_FLAGS_UTC_BOOT_TIME      0x00000001
+#define INTERNAL_BOOT_FLAGS_RTC_BOOT_TIME      0x00000002
+#define INTERNAL_BOOT_FLAGS_NO_LEGACY_SERVICES 0x00000004
+
+typedef struct _LOADER_PARAMETER_EXTENSION {
+	ULONG   Size; // set to sizeof (struct _LOADER_PARAMETER_EXTENSION)
 	PROFILE_PARAMETER_BLOCK Profile;
 
 	//
 	// Errata Manager inf file.
 	//
-	VOID*   EmInfFileImage;
-	UINT32   EmInfFileSize;
+
+	PVOID   EmInfFileImage;
+	ULONG   EmInfFileSize;
 
 	//
 	// Pointer to the triage block, if present.
 	//
-	VOID* TriageDumpBlock;
+
+	PVOID TriageDumpBlock;
 
 	struct _HEADLESS_LOADER_BLOCK *HeadlessLoaderBlock;
 
 	struct _SMBIOS3_TABLE_HEADER *SMBiosEPSHeader;
 
-	VOID*   DrvDBImage;   // Database used to identify "broken" drivers.
-	UINT32   DrvDBSize;
+	PVOID   DrvDBImage;   // Database used to identify "broken" drivers.
+	ULONG   DrvDBSize;
 
 	// If booting from the Network (PXE) then we will
 	// save the Network boot params in this loader block
 	struct _NETWORK_LOADER_BLOCK *NetworkLoaderBlock;
 
 #if defined(_X86_)
+
 	//
 	// Pointers to IRQL translation tables that reside in the HAL
 	// and are exposed to the kernel for use in the "inlined IRQL"
 	// build
 	//
+
 	PUCHAR HalpIRQLToTPR;
 	PUCHAR HalpVectorToIRQL;
+
 #endif
 
 	//
 	// Firmware Location
 	//
+
 	LIST_ENTRY  FirmwareDescriptorListHead;
 
 	//
@@ -603,101 +533,113 @@ typedef struct _LOADER_PARAMETER_EXTENSION
 	// table file is a simple binary file with one or more ACPI tables laid
 	// out one after another.
 	//
-	VOID*   AcpiTable;
+
+	PVOID   AcpiTable;
 
 	//
 	// Size of override ACPI tables in bytes.
 	//
-	UINT32   AcpiTableSize;
+
+	ULONG   AcpiTableSize;
 
 	//
 	// Various informational flags passed to OS via OS Loader.
 	//
-	struct
-	{
+
+	struct {
+
 		//
 		// Variables describing the success of the previous boot - whether
 		// booting into the OS was successful, and whether the arc from boot to
 		// runtime to shutdown was successful.  Various types of system crashes
 		// will cause one or both of these to be FALSE.
 		//
-		UINT32 LastBootSucceeded : 1;
-		UINT32 LastBootShutdown : 1;
+
+		ULONG LastBootSucceeded : 1;
+		ULONG LastBootShutdown : 1;
 
 		//
 		// A flag indicating whether the platform supports access to IO ports.
 		//
-		UINT32 IoPortAccessSupported : 1;
+
+		ULONG IoPortAccessSupported : 1;
 
 		//
 		// A flag indicating whether or not the boot debugger persisted
 		// through kernel initialization.
 		//
-		UINT32 BootDebuggerActive : 1;
+
+		ULONG BootDebuggerActive : 1;
 
 		//
 		// A flag indicating whether the system must enforce strong code
 		// guarantees.
 		//
-		UINT32 StrongCodeGuarantees : 1;
+
+		ULONG StrongCodeGuarantees : 1;
 
 		//
 		// A flag indicating whether the system must enforce hard strong code
 		// guarantees.
 		//
-		UINT32 HardStrongCodeGuarantees : 1;
+
+		ULONG HardStrongCodeGuarantees : 1;
 
 		//
 		// A flag indicating whether SID sharing disabled.
 		//
-		UINT32 SidSharingDisabled : 1;
+
+		ULONG SidSharingDisabled : 1;
 
 		//
 		// A flag indicating whether TPM was intialized successfully or not
 		// by the OS loader during boot.
 		//
-		UINT32 TpmInitialized : 1;
+
+		ULONG TpmInitialized : 1;
 
 		//
 		// A flag indicating whether the VSM code page has been configured and
 		// is usable.
 		//
-		UINT32 VsmConfigured : 1;
+
+		ULONG VsmConfigured : 1;
 
 		//
 		// A flag indicating whether IUM is enabled.
 		//
-		UINT32 IumEnabled : 1;
 
-		//
-		// A flag indicating whether we're booting from SMB
-		//
-		UINT32 IsSmbboot : 1;
+		ULONG IumEnabled : 1;
 
 		//
 		// The remainder of the bits are reserved.
 		//
-		UINT32 Reserved : 21;
-	} x;
+
+		ULONG Reserved : 22;
+	};
 
 	//
 	// Loader runtime performance data.
 	//
+
 	PLOADER_PERFORMANCE_DATA LoaderPerformanceData;
 
 	//
 	// Boot application persistent data.
 	//
+
 	LIST_ENTRY BootApplicationPersistentData;
 
 	//
 	// Windows Memory Diagnostic Test Results.
 	//
-	VOID* WmdTestResult;
+
+	PVOID WmdTestResult;
 
 	//
 	// Boot entry identifier.
 	//
+
 	GUID BootIdentifier;
 
 	//
@@ -705,110 +647,132 @@ typedef struct _LOADER_PARAMETER_EXTENSION
 	// scratch space.  This should correspond to the boot environment's memory
 	// footprint.
 	//
-	UINT32 ResumePages;
+
+	ULONG ResumePages;
 
 	//
 	// The crash dump header, if present.
 	//
-	VOID* DumpHeader;
+
+	PVOID DumpHeader;
 
 	//
 	// Boot graphics context.
 	//
-	VOID* BgContext;
+
+	PVOID BgContext;
 
 	//
 	// NUMA node locality information and group assignment data.
 	//
-	VOID* NumaLocalityInfo;
-	VOID* NumaGroupAssignment;
+
+	PVOID NumaLocalityInfo;
+	PVOID NumaGroupAssignment;
 
 	//
 	// List of hives attached by loader
 	//
+
 	LIST_ENTRY AttachedHives;
 
 	//
 	// Number of entries in the MemoryCachingRequirements map.
 	//
-	UINT32 MemoryCachingRequirementsCount;
+
+	ULONG MemoryCachingRequirementsCount;
 
 	//
 	// List of MEMORY_CACHING_REQUIREMENTS for the system.
 	//
-	VOID* MemoryCachingRequirements;
+
+	PVOID MemoryCachingRequirements;
 
 	//
 	// Result of the Boot entropy gathering.
 	//
+
 	BOOT_ENTROPY_LDR_RESULT BootEntropyResult;
 
 	//
 	// Computed ITC/TSC frequency of the BSP in hertz.
 	//
-	UINT64 ProcessorCounterFrequency;
+
+	ULONGLONG ProcessorCounterFrequency;
 
 	//
 	// Hypervisor specific information.
 	//
+
 	LOADER_PARAMETER_HYPERVISOR_EXTENSION HypervisorExtension;
 
 	//
 	// Hardware configuration ID used to uniquelly identify the system.
 	//
+
 	GUID HardwareConfigurationId;
 
 	//
 	// List of HAL_EXTENSION_MODULE_ENTRY structures.
 	//
+
 	LIST_ENTRY HalExtensionModuleList;
 
 	//
 	// Contains most recent time from firmware, bootstat.dat and ntos build time.
 	//
+
 	LARGE_INTEGER SystemTime;
 
 	//
 	// Contains cycle counter timestamp at the time SystemTime value was read.
 	//
-	UINT64 TimeStampAtSystemTimeRead;
+
+	ULONGLONG TimeStampAtSystemTimeRead;
 
 	//
 	// Boot Flags that are passed to the SystemBootEnvironmentInformation class.
 	//
-	UINT64 BootFlags;
+
+	ULONGLONG BootFlags;
 
 	//
 	// Internal only flags that are passed to the kernel.
 	//
-	UINT64 InternalBootFlags;
+
+	ULONGLONG InternalBootFlags;
 
 	//
 	// Pointer to the in-memory copy of the Wfs FP data.
 	//
-	VOID*   WfsFPData;
+
+	PVOID   WfsFPData;
 
 	//
 	// Size of Wfs FP data in bytes.
 	//
-	UINT32   WfsFPDataSize;
+
+	ULONG   WfsFPDataSize;
 
 	//
 	// Loader bugcheck parameters for the kernel or extensions to act upon
 	//
+
 	LOADER_BUGCHECK_PARAMETERS BugcheckParameters;
 
 	//
 	// API set schema data.
 	//
-	VOID* ApiSetSchema;
-	UINT32 ApiSetSchemaSize;
+
+	PVOID ApiSetSchema;
+	ULONG ApiSetSchemaSize;
 	LIST_ENTRY ApiSetSchemaExtensions;
 
 	//
 	// The system's firmware version according to ACPI's FADT,
-	// SMBIOS's BIOS information table, and EFI's system table respectively.
+	// SMBIOS's BIOS information table, and EFI's system table
+	// respectively.
 	//
+
 	UNICODE_STRING AcpiBiosVersion;
 	UNICODE_STRING SmbiosVersion;
 	UNICODE_STRING EfiVersion;
@@ -816,58 +780,269 @@ typedef struct _LOADER_PARAMETER_EXTENSION
 	//
 	// Debugger Descriptor
 	//
+
 	struct _DEBUG_DEVICE_DESCRIPTOR *KdDebugDevice;
 
 	//
 	// EFI Offline crashdump configuration table.
 	//
+
 	OFFLINE_CRASHDUMP_CONFIGURATION_TABLE OfflineCrashdumpConfigurationTable;
 
 	//
 	// Manufacturing mode profile name.
 	//
+
 	UNICODE_STRING ManufacturingProfile;
 
 	//
 	// BBT Buffer to enable precise event based sampling.
 	//
-	VOID* BbtBuffer;
+
+	PVOID BbtBuffer;
 
 	//
 	// Registry values to be passed to the kernel for calculation of Xsave Buffer Size on Intel platforms
 	//
-#if defined(_X86_) || defined (_AMD64_) || defined (_WIN64)
-	UINT64 XsaveAllowedFeatures;
-	UINT32 XsaveFlags;
+
+#if defined(_X86_) || defined (_AMD64_)
+
+	ULONG64 XsaveAllowedFeatures;
+	ULONG XsaveFlags;
+
 #endif
 
 	//
 	// Boot options used by the OS loader.
 	//
-	VOID* BootOptions;
+
+	PVOID BootOptions;
 
 	//
 	// Boot sequence tracking for reliability reporting.
 	//
-	UINT32 BootId;
+
+	ULONG BootId;
 
 	//
 	// Code Integrity configuration.
 	//
-	PLOADER_PARAMETER_CI_EXTENSION CodeIntegrityData;
-	UINT32 CodeIntegrityDataSize;
 
-	LOADER_HIVE_RECOVERY_INFO SystemHiveRecoveryInfo;
+	PLOADER_PARAMETER_CI_EXTENSION CodeIntegrityData;
+	ULONG CodeIntegrityDataSize;
+
 } LOADER_PARAMETER_EXTENSION, *PLOADER_PARAMETER_EXTENSION;
 
-typedef struct _LOADER_PARAMETER_BLOCK
+struct _HEADLESS_LOADER_BLOCK;
+struct _SMBIOS_TABLE_HEADER;
+
+typedef struct _NETWORK_LOADER_BLOCK {
+
+	// Binary contents of the entire DHCP Acknowledgment
+	// packet received by PXE.
+	PUCHAR DHCPServerACK;
+	ULONG DHCPServerACKLength;
+
+	// Binary contents of the entire BINL Reply
+	// packet received by PXE.
+	PUCHAR BootServerReplyPacket;
+	ULONG BootServerReplyPacketLength;
+
+} NETWORK_LOADER_BLOCK, *PNETWORK_LOADER_BLOCK;
+
+typedef struct _VIRTUAL_EFI_RUNTIME_SERVICES {
+
+	//
+	//  (Virtual) Entry points to each of the EFI Runtime services.
+	//
+
+	ULONG_PTR GetTime;
+	ULONG_PTR SetTime;
+	ULONG_PTR GetWakeupTime;
+	ULONG_PTR SetWakeupTime;
+	ULONG_PTR SetVirtualAddressMap;
+	ULONG_PTR ConvertPointer;
+	ULONG_PTR GetVariable;
+	ULONG_PTR GetNextVariableName;
+	ULONG_PTR SetVariable;
+	ULONG_PTR GetNextHighMonotonicCount;
+	ULONG_PTR ResetSystem;
+	ULONG_PTR UpdateCapsule;
+	ULONG_PTR QueryCapsuleCapabilities;
+	ULONG_PTR QueryVariableInfo;
+
+} VIRTUAL_EFI_RUNTIME_SERVICES, *PVIRTUAL_EFI_RUNTIME_SERVICES;
+
+typedef struct _EFI_FIRMWARE_INFORMATION {
+	ULONG FirmwareVersion;
+	PVIRTUAL_EFI_RUNTIME_SERVICES VirtualEfiRuntimeServices;
+
+	//
+	// The return value from SetVirtualAddressMap call.
+	//
+
+	NTSTATUS SetVirtualAddressMapStatus;
+
+	//
+	// Number of mappings missed if any due to change in firmware
+	// runtime memory map (for debugging).
+	//
+
+	ULONG MissedMappingsCount;
+
+	//
+	// The firmware resource list identifies firmware components that can
+	// be updated via WU.
+	//
+
+	LIST_ENTRY FirmwareResourceList;
+
+	//
+	// The EFI memory map.
+	//
+
+	PVOID EfiMemoryMap;
+	ULONG EfiMemoryMapSize;
+	ULONG EfiMemoryMapDescriptorSize;
+
+} EFI_FIRMWARE_INFORMATION, *PEFI_FIRMWARE_INFORMATION;
+
+typedef struct _PCAT_FIRMWARE_INFORMATION {
+	ULONG PlaceHolder;
+
+} PCAT_FIRMWARE_INFORMATION, *PPCAT_FIRMWARE_INFORMATION;
+
+typedef struct _FIRMWARE_INFORMATION_LOADER_BLOCK {
+	struct {
+
+		//
+		// If set to TRUE, indicates that the system is running on EFI
+		// firmware.
+		//
+
+		ULONG FirmwareTypeEfi : 1;
+
+		//
+		// A flag indicating whether EFI runtime service calls must be routed
+		// through IUM.
+		//
+
+		ULONG EfiRuntimeUseIum : 1;
+
+		//
+		// A flag indicating whether EFI runtime code and data pages are
+		// separate and protected with RW or RX protections.
+		//
+
+		ULONG EfiRuntimePageProtectionEnabled : 1;
+
+		//
+		// A flag indicating whether the firmware supports code and data page
+		// separation with restricted protections.
+		//
+
+		ULONG EfiRuntimePageProtectionSupported : 1;
+
+#if defined (_ARM64_)
+
+		//
+		// If set to TRUE, indicates that the system EFI was started in EL2
+		// and therefore has something running there (hypervisor/microvisor).
+		// Also, this is where APs will start (EL2), and need to be directed
+		// to EL1 properly before they can start in the HLOS.
+		//
+
+		ULONG FirmwareStartedInEL2 : 1;
+
+		ULONG Reserved : 27;
+
+#else
+
+		ULONG Reserved : 28;
+
+#endif
+
+	};
+
+	union {
+		EFI_FIRMWARE_INFORMATION EfiInformation;
+		PCAT_FIRMWARE_INFORMATION PcatInformation;
+	} u;
+
+} FIRMWARE_INFORMATION_LOADER_BLOCK, *PFIRMWARE_INFORMATION_LOADER_BLOCK;
+
+//
+// Boot loader data table entry. Each of the load lists in the parameter block
+// consist of boot loader data table entries.
+//
+// N.B. This structure requires ntldr.h to have been included.
+//
+
+//#if defined(_NTSYSTEM_) || (defined(NT_INCLUDED) && !defined(_NTHAL_INCLUDED_))
+
+#define BLDR_FLAGS_CORE_DRIVER_DEPENDENT_DLL 0x00000001
+#define BLDR_FLAGS_CORE_EXTENSION_DEPENDENT_DLL 0x00000002
+typedef struct _NON_PAGED_DEBUG_INFO
 {
-	UINT32 OsMajorVersion;
-	UINT32 OsMinorVersion;
-	UINT32 Size;
-	UINT32 OsLoaderSecurityVersion;
+	USHORT      Signature;
+	USHORT      Flags;
+	ULONG       Size;
+	USHORT      Machine;
+	USHORT      Characteristics;
+	ULONG       TimeDateStamp;
+	ULONG       CheckSum;
+	ULONG       SizeOfImage;
+	ULONGLONG   ImageBase;
+} NON_PAGED_DEBUG_INFO, *PNON_PAGED_DEBUG_INFO;
+
+
+typedef struct _KLDR_DATA_TABLE_ENTRY
+{
+	LIST_ENTRY InLoadOrderLinks;
+	PVOID ExceptionTable;
+	ULONG ExceptionTableSize;
+	// ULONG padding on IA64
+	PVOID GpValue;
+	PNON_PAGED_DEBUG_INFO NonPagedDebugInfo;
+	PVOID DllBase;
+	PVOID EntryPoint;
+	ULONG SizeOfImage;
+	UNICODE_STRING FullDllName;
+	UNICODE_STRING BaseImageName;
+	ULONG Flags;
+	USHORT LoadCount;
+	USHORT __Unused5;
+	PVOID SectionPointer;
+	ULONG CheckSum;
+	// ULONG padding on IA64
+	PVOID LoadedImports;
+	PVOID PatchInformation;
+} KLDR_DATA_TABLE_ENTRY, *PKLDR_DATA_TABLE_ENTRY;
+
+typedef struct _BLDR_DATA_TABLE_ENTRY {
+	KLDR_DATA_TABLE_ENTRY KldrEntry;
+	UNICODE_STRING CertificatePublisher;
+	UNICODE_STRING CertificateIssuer;
+	PVOID ImageHash;
+	PVOID CertificateThumbprint;
+	ULONG ImageHashAlgorithm;
+	ULONG ThumbprintHashAlgorithm;
+	ULONG ImageHashLength;
+	ULONG CertificateThumbprintLength;
+	ULONG LoadInformation;
+	ULONG Flags;
+} BLDR_DATA_TABLE_ENTRY, *PBLDR_DATA_TABLE_ENTRY;
+
+//#endif
+
+typedef struct _LOADER_PARAMETER_BLOCK {
+	ULONG OsMajorVersion;
+	ULONG OsMinorVersion;
+	ULONG Size;
+	ULONG Reserved;
 	LIST_ENTRY LoadOrderListHead;
 	LIST_ENTRY MemoryDescriptorListHead;
+
 	//
 	// Define the Core, TPM Core and Core Extensions driver lists. The
 	// lists are organized as follows:
@@ -890,161 +1065,60 @@ typedef struct _LOADER_PARAMETER_BLOCK
 	//
 	//  5. Boot Driver: This list contains the rest of the boot drivers.
 	//
+
 	LIST_ENTRY BootDriverListHead;
 	LIST_ENTRY EarlyLaunchListHead;
 	LIST_ENTRY CoreDriverListHead;
 	LIST_ENTRY CoreExtensionsDriverListHead;
 	LIST_ENTRY TpmCoreDriverListHead;
-	UINT64 KernelStack;
-	UINT64 Prcb;
-	UINT64 Process;
-	UINT64 Thread;
-	UINT32 KernelStackSize;
-	UINT32 RegistryLength;
-	VOID* RegistryBase;
+	ULONG_PTR KernelStack;
+	ULONG_PTR Prcb;
+	ULONG_PTR Process;
+	ULONG_PTR Thread;
+	ULONG KernelStackSize;
+	ULONG RegistryLength;
+	PVOID RegistryBase;
 	PCONFIGURATION_COMPONENT_DATA ConfigurationRoot;
-	UINT8* ArcBootDeviceName;
-	UINT8* ArcHalDeviceName;
-	UINT8* NtBootPathName;
-	UINT8* NtHalPathName;
-	UINT8* LoadOptions;
+	PCHAR ArcBootDeviceName;
+	PCHAR ArcHalDeviceName;
+	PCHAR NtBootPathName;
+	PCHAR NtHalPathName;
+	PCHAR LoadOptions;
 	PNLS_DATA_BLOCK NlsData;
 	PARC_DISK_INFORMATION ArcDiskInformation;
 	PLOADER_PARAMETER_EXTENSION Extension;
-	union
-	{
+	union {
 		I386_LOADER_BLOCK I386;
 		ARM_LOADER_BLOCK Arm;
 	} u;
+
 	FIRMWARE_INFORMATION_LOADER_BLOCK FirmwareInformation;
 } LOADER_PARAMETER_BLOCK, *PLOADER_PARAMETER_BLOCK;
 
+
+#define LHB_SYSTEM_HIVE      0x01
+#define LHB_BOOT_PARTITION   0x02
+#define LHB_SYSTEM_PARTITION 0x04
+#define LHB_ELAM_HIVE        0x08
+#define LHB_MOUNT_VOLATILE   0x10
+
+#define LHB_VALID_FLAGS     (LHB_SYSTEM_HIVE | LHB_BOOT_PARTITION | LHB_SYSTEM_PARTITION | LHB_ELAM_HIVE | LHB_MOUNT_VOLATILE)
+
+typedef struct _LOADER_HIVE_BLOCK {
+	LIST_ENTRY Entry;
+	PWCHAR FilePath;
+	ULONG Flags;
+	PVOID RegistryBase;
+	ULONG RegistryLength;
+	PWCHAR RegistryName;
+	PWCHAR RegistryParent;
+
+} LOADER_HIVE_BLOCK, *PLOADER_HIVE_BLOCK;
+
 typedef VOID(EFIAPI *tOslArchTransferToKernel)(PLOADER_PARAMETER_BLOCK KernelParams, VOID *KiSystemStartup);
-UINT8 sigOslArchTransferToKernelCall[] = { 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0xEB, 0xFE }; // 48 8B 45 A8 33 FF
+//  "\xE8\xAA\xAA\xAA\xAA\x45\x33"
+UINT8 sigOslArchTransferToKernelCall[] = { 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0x45, 0x33 }; // 48 8B 45 A8 33 FF
 UINT8* OslArchTransferToKernelCallPatchLocation;
 UINT8 OslArchTransferToKernelCallBackup[5];
 
 tOslArchTransferToKernel oOslArchTransferToKernel = NULL;
-
-typedef struct _LDR_DATA_TABLE_ENTRY
-{
-	//
-	// in load order link list entry,offset = 0
-	//
-	LIST_ENTRY											InLoadOrderLinks;
-
-	//
-	// in memory order link list entry,offset = 8
-	//
-	LIST_ENTRY											InMemoryOrderLinks;
-
-	//
-	// in initialization order list entry,offset = 10
-	//
-	LIST_ENTRY											InInitializationOrderLinks;
-
-	//
-	// image base,offset = 18
-	//
-	VOID*												DllBase;
-
-	//
-	// entry point,offset = 1c
-	//
-	VOID*												EntryPoint;
-
-	//
-	// size of image,offset = 20
-	//
-	VOID*												SizeOfImage;
-
-	//
-	// full dll name,offset = 24
-	//
-	UNICODE_STRING										FullDllName;
-
-	//
-	// base dll name,offset = 2c
-	//
-	UNICODE_STRING										BaseDllName;
-
-	//
-	// flags,offset = 34
-	//
-	UINT32												Flags;
-
-	//
-	// reference count,offset = 38
-	//
-	UINT16												LoadCount;
-
-	//
-	// thread local storage index,offset = 3a
-	//
-	UINT16												TlsIndex;
-
-	union
-	{
-		//
-		// hash links,offset = 3c
-		//
-		LIST_ENTRY										HashLinks;
-
-		//
-		// section and checksum
-		//
-		struct
-		{
-			//
-			// section pointer,offset = 3c
-			//
-			VOID*										SectionPointer;
-
-			//
-			// checksum,offset = 40
-			//
-			UINT32										CheckSum;
-		} u;
-	} v;
-
-	union
-	{
-		//
-		// time stamp,offset = 44
-		//
-		UINT32											TimeDateStamp;
-
-		//
-		// loaded imports,offset = 44
-		//
-		VOID*											LoadedImports;
-	} x;
-
-	//
-	// entry point activation context,offset = 48
-	//
-	VOID*												EntryPointActivationContext;
-}LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
-
-typedef struct _BOOT_DRIVER_LIST_ENTRY
-{
-	//
-	// link
-	//
-	LIST_ENTRY											Link;
-
-	//
-	// file path
-	//
-	UNICODE_STRING										FilePath;
-
-	//
-	// registry path
-	//
-	UNICODE_STRING										RegistryPath;
-
-	//
-	// loader entry
-	//
-	PLDR_DATA_TABLE_ENTRY								LdrEntry;
-}BOOT_DRIVER_LIST_ENTRY, *PBOOT_DRIVER_LIST_ENTRY;

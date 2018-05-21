@@ -14,6 +14,8 @@
     </ClInclude>
     <ClInclude Include="arc.h" />
     <ClInclude Include="utils.h" />
+    <ClInclude Include="wintypes.h" />
+    <ClInclude Include="bootloader.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="asm">

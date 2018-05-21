@@ -40,9 +40,11 @@ copy $(TargetPath) E:\</Command>
   <ItemGroup>
     <ClInclude Include="arc.h" />
     <ClInclude Include="asm.h" />
+    <ClInclude Include="bootloader.h" />
     <ClInclude Include="drv.h" />
     <ClInclude Include="drvproto.h" />
     <ClInclude Include="utils.h" />
+    <ClInclude Include="wintypes.h" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="get_exit_bootservices_address.asm" />

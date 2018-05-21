@@ -88,6 +88,11 @@ EFI_STATUS UtilFindPattern(IN UINT8* Pattern, IN UINT8 Wildcard, IN UINT32 Patte
 VOID* UtilCallAddress(IN VOID* CallAddress)
 {
 	UINT32 RelativeCallOffset = *(UINT32*)((UINT8*)CallAddress + 1);
+
+	Print(L"off %lx\r\n", RelativeCallOffset);
+	Print(L"(UINT8*)CallAddress %lx\r\n", (UINT8*)CallAddress);
+	Print(L"sizeof(UINT32) %lx\r\n", sizeof(UINT32));
+
 	return (VOID*)((UINT8*)CallAddress + RelativeCallOffset + 1 + sizeof(UINT32));
 }
 
