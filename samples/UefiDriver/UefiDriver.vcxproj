@@ -9,6 +9,7 @@
   <PropertyGroup Label="Globals">
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{DF325AB7-67A6-473E-93FF-16955AFBC063}</ProjectGuid>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <Import Project="$(SolutionDir)\samples.default.props" />
@@ -22,29 +23,41 @@
     <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>
   <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(EDK_PATH)\MdePkg\Include;$(EDK_PATH)\MdePkg\Include\X64;$(EDK_PATH)\ShellPkg\Include;$(EDK_PATH)\CryptoPkg\Include;$(VC_IncludePath);</IncludePath>
+    <ExcludePath>$(WindowsSDK_IncludePath);$(MSBuild_ExecutablePath);$(VC_LibraryPath_x64);</ExcludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup>
     <Link>
       <AdditionalDependencies>UefiDriverEntryPoint.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">del E:\$(TargetName).efi
-copy $(TargetPath) E:\</Command>
+copy $(TargetPath) E:\
+EXIT 0</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="debug.c" />
     <ClCompile Include="drvname.c" />
     <ClCompile Include="drvpnp.c" />
     <ClCompile Include="drvmain.c" />
+    <ClCompile Include="printf.c" />
+    <ClCompile Include="serial.c" />
     <ClCompile Include="utils.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="arc.h" />
     <ClInclude Include="asm.h" />
     <ClInclude Include="bootloader.h" />
+    <ClInclude Include="debug.h" />
     <ClInclude Include="drv.h" />
     <ClInclude Include="drvproto.h" />
+    <ClInclude Include="globals.h" />
+    <ClInclude Include="printf.h" />
+    <ClInclude Include="serial.h" />
+    <ClInclude Include="types.h" />
     <ClInclude Include="utils.h" />
-    <ClInclude Include="wintypes.h" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="get_exit_bootservices_address.asm" />

@@ -45,3 +45,6 @@ UINT32 UtilCodeSize(IN UINT8* CodeStart);
 // Displays x64 disassembly at specified address
 //
 //VOID UtilDisassembleCode(IN UINT8* CodeStart, IN VOID* VirtualAddress, IN UINT32 Length);
+
+
+//void ConsolePrint(char *Message);

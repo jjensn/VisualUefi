@@ -106,5 +106,3 @@ typedef EFI_IMAGE_NT_HEADERS64 EFI_IMAGE_NT_HEADERS;
 typedef EFI_IMAGE_NT_HEADERS32 EFI_IMAGE_NT_HEADERS;
 
 #endif
-
-#define RVATOVA(_base_, _offset_) ((UCHAR*)(_base_) + (UINT32)(_offset_))
