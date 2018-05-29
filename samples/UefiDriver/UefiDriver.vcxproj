@@ -34,28 +34,25 @@
     <PostBuildEvent>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">del E:\$(TargetName).efi
 copy $(TargetPath) E:\
-EXIT 0</Command>
+del C:\myserversymbols\$(TargetName).pdb
+copy $(TargetDir)$(TargetName).pdb C:\myserversymbols\$(TargetName).pdb</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="debug.c" />
     <ClCompile Include="drvname.c" />
     <ClCompile Include="drvpnp.c" />
     <ClCompile Include="drvmain.c" />
     <ClCompile Include="printf.c" />
-    <ClCompile Include="serial.c" />
     <ClCompile Include="utils.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="arc.h" />
     <ClInclude Include="asm.h" />
     <ClInclude Include="bootloader.h" />
-    <ClInclude Include="debug.h" />
     <ClInclude Include="drv.h" />
     <ClInclude Include="drvproto.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="printf.h" />
-    <ClInclude Include="serial.h" />
     <ClInclude Include="types.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>

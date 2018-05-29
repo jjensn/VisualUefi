@@ -5,9 +5,7 @@
     <ClCompile Include="drvpnp.c" />
     <ClCompile Include="drvmain.c" />
     <ClCompile Include="utils.c" />
-    <ClCompile Include="debug.c" />
     <ClCompile Include="printf.c" />
-    <ClCompile Include="serial.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="drv.h" />
@@ -18,11 +16,9 @@
     <ClInclude Include="arc.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="bootloader.h" />
-    <ClInclude Include="debug.h" />
     <ClInclude Include="printf.h" />
     <ClInclude Include="types.h" />
     <ClInclude Include="globals.h" />
-    <ClInclude Include="serial.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="asm">

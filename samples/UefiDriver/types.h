@@ -66,7 +66,8 @@ UINT8 sigInitPatchGuard[] = { 0x75, 0x2D, 0x0F, 0xB6, 0x15 };
 UINTN sigInitPatchGuardSize = 5;
 VOID* InitPatchGuardPatchLocation = NULL;
 
-typedef ULONG(*tDbgPrint)(char* Format, ...);
+//signed  ConsoleCreateLocalInputConsole()
+typedef __int64(*tDbgPrint)();
 tDbgPrint oDbgPrint;
 
 #endif
