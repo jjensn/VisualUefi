@@ -32,8 +32,8 @@
       <AdditionalDependencies>UefiDriverEntryPoint.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">del E:\$(TargetName).efi
-copy $(TargetPath) E:\
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">del Z:\$(TargetName).efi
+copy $(TargetPath) Z:\
 del C:\myserversymbols\$(TargetName).pdb
 copy $(TargetDir)$(TargetName).pdb C:\myserversymbols\$(TargetName).pdb</Command>
     </PostBuildEvent>

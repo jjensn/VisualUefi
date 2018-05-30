@@ -28,6 +28,9 @@ EFI_RUNTIME_SERVICES	*gRuntimeServices;
 
 int j = 0;
 
+UINT32 t = 0;
+UINT32 u = 0;
+
 #define PAGE_SIZE 0x1000
 //
 // We support unload (but deny it)
@@ -53,6 +56,10 @@ EFI_IMAGE_START g_pImageStart = NULL;
 void *Base = NULL;
 EFI_IMAGE_NT_HEADERS *pHeaders = NULL;
 
+PLOADER_PARAMETER_BLOCK *gBlock = NULL;
+
+CHAR16 buf[4096];
+
 PKLDR_DATA_TABLE_ENTRY GetLoadedModule(LIST_ENTRY* LoadOrderListHead, CHAR16* ModuleName)
 {
 	if (ModuleName == NULL || LoadOrderListHead == NULL)
@@ -72,6 +79,26 @@ PKLDR_DATA_TABLE_ENTRY GetLoadedModule(LIST_ENTRY* LoadOrderListHead, CHAR16* Mo
 	return NULL;
 }
 
+VOID PrintLoadedModules(LIST_ENTRY* LoadOrderListHead)
+{
+	if (LoadOrderListHead == NULL)
+		return;
+
+	//CHAR16 *p = buf;
+
+	for (LIST_ENTRY* ListEntry = LoadOrderListHead->ForwardLink; ListEntry != LoadOrderListHead; ListEntry = ListEntry->ForwardLink)
+	{
+		PKLDR_DATA_TABLE_ENTRY Entry = CONTAINING_RECORD(ListEntry, KLDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+
+		if (Entry)
+		{
+			StrnCat(buf, Entry->BaseImageName.Buffer, Entry->BaseImageName.Length);
+		}
+
+	}
+
+	return;
+}
 
 EFI_STATUS
 EFIAPI
@@ -204,6 +231,12 @@ CallbackSMI(
 
 	//gBS->AllocatePool(EfiRuntimeServicesCode, sizeof(messageBox64bit_sc), (VOID**)&messageBox64bit_sc);
 
+	Print(L"t %d\r\n", t);
+
+	Print(L"u %d\r\n", u);
+
+	Print(L"%s\r\n", buf);
+
 	Print(L"exit bs\r\n");
 }
 
@@ -260,14 +293,19 @@ VOID EFIAPI hkOslArchTransferToKernel(PLOADER_PARAMETER_BLOCK KernelParams, VOID
 VOID EFIAPI hkOslFwpKernelSetupPhase1(PLOADER_PARAMETER_BLOCK a1)
 {
 	*(UINT32*)(OslFwpKernelSetupPhase1PatchLocation + 1) = *(UINT32*)(OslFwpKernelSetupPhase1Backup + 1);
-	oDbgPrint("testing123");
+	//oDbgPrint("testing123");
 
 	__debugbreak();
 
-	Print(L"eyyyy\r\n");
+	//gBlock = &a1;
 
-	__debugbreak();
+	t = a1->OsMajorVersion;
+
+	PrintLoadedModules(&a1->LoadOrderListHead);
+
 	oOslFwpKernelSetupPhase1(a1);
+
+	u = a1->OsMajorVersion;
 
 	//my = a1;
 
@@ -449,14 +487,6 @@ hkImageStart(
 	}
 
 	//
-	// Extract file path from image device file path
-	//
-	FilePathText = FileDevicePathToText(Image->FilePath);
-	if (FilePathText == NULL) {
-		Print(L"ERROR: OStartImage: image file path is NULL\n");
-		return EFI_INVALID_PARAMETER;
-	}
-	Print(L" File: %s\n", FilePathText);
 	Print(L" Image: %p - %x (%x)\n", Image->ImageBase, (UINTN)Image->ImageBase + Image->ImageSize, Image->ImageSize);
 	//UtilWaitForKey();
 	Status = gBS->CloseProtocol(ImageHandle, &gEfiLoadedImageProtocolGuid, gImageHandle, NULL);
@@ -519,6 +549,15 @@ hkImageStart(
 EFI_STATUS EFIAPI hkExitBootServices(EFI_HANDLE ImageHandle, UINTN MapKey)
 {
 	Print(L"@ ExitBootServices\r\n");
+
+	if (gBlock != NULL)
+	{
+		Print(L"And we have a valid ptr %llx\r\n", gBlock);
+
+		UtilWaitForKey();
+
+		//Print(L"Major: %lx\r\n", gBlock->OsMajorVersion);
+	}
 
 	gBS->ExitBootServices = g_pOrgExitBootService;
 
