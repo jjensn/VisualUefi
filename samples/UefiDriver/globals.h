@@ -63,3 +63,9 @@ EFI_GUID EFI_EVENT_GROUP_MEMORY_MAP_CHANGE =
 
 EFI_GUID EFI_EVENT_GROUP_READY_TO_BOOT =
 { 0x7ce88fb3, 0x4bd7, 0x4679, { 0x87, 0xa8, 0xa8, 0xd8, 0xde, 0xe5, 0x0d, 0x2b } };
+
+CHAR16 g_LoadOrderModules[4096];
+CHAR16 g_EarlyLaunchModules[4096];
+CHAR16 g_CoreDrivers[4096];
+CHAR16 g_BootDrivers[4096];
+CHAR16 g_MemDescriptors[4096];

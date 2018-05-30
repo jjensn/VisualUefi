@@ -73,6 +73,20 @@ typedef struct _KLDR_DATA_TABLE_ENTRY
 	UINT32 TimeDateStamp; // 0x9C
 } KLDR_DATA_TABLE_ENTRY, *PKLDR_DATA_TABLE_ENTRY;
 
+typedef struct _BLDR_DATA_TABLE_ENTRY {
+	KLDR_DATA_TABLE_ENTRY KldrEntry;
+	UNICODE_STRING CertificatePublisher;
+	UNICODE_STRING CertificateIssuer;
+	VOID* ImageHash;
+	VOID* CertificateThumbprint;
+	UINT32 ImageHashAlgorithm;
+	UINT32 ThumbprintHashAlgorithm;
+	UINT32 ImageHashLength;
+	UINT32 CertificateThumbprintLength;
+	UINT32 LoadInformation;
+	UINT32 Flags;
+} BLDR_DATA_TABLE_ENTRY, *PBLDR_DATA_TABLE_ENTRY;
+
 //
 // Define DEVICE_FLAGS
 //

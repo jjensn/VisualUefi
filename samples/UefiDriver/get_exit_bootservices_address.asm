@@ -1,28 +1,28 @@
 .code
 
-public get_addr
-public _ExitBootServices
+;public get_addr
+;public _ExitBootServices
 
 ; handler and return address for ExitBootServices() hook
-extern ret_ExitBootServices:qword
-extern hkExitBootServices:proc
+;extern ret_ExitBootServices:qword
+;extern hkExitBootServices:proc
 
-get_addr:
+;get_addr:
 
-    call    _lb
+;    call    _lb
     
-_lb:
+;_lb:
 
-    pop     rax
-    ret
+;    pop     rax
+;    ret
 
-_ExitBootServices:
+;_ExitBootServices:
  
     ; save return address into the global variable
-    mov     rax, [rsp]
-    mov     ret_ExitBootServices, rax
+;    mov     rax, [rsp]
+;    mov     ret_ExitBootServices, rax
 
     ; jump to the hook handler
-    jmp     hkExitBootServices
+;    jmp     hkExitBootServices
 
 end
