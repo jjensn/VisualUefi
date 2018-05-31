@@ -1,7 +1,8 @@
 {
   "ExpandedNodes": [
     "",
-    "\\EDK-II"
+    "\\EDK-II",
+    "\\EDK-II\\GlueLib"
   ],
   "SelectedNode": "\\EDK-II\\EDK-II.sln",
   "PreviewInSolutionExplorer": false

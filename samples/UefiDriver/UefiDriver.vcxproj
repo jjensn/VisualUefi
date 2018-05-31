@@ -30,6 +30,7 @@
   <ItemDefinitionGroup>
     <Link>
       <AdditionalDependencies>UefiDriverEntryPoint.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem Condition="'$(Configuration)|$(Platform)'=='Release|x64'">EFI Runtime</SubSystem>
     </Link>
     <PostBuildEvent>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">del Z:\$(TargetName).efi

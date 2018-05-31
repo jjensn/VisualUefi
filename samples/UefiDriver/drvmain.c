@@ -26,6 +26,13 @@ EFI_SYSTEM_TABLE	*gSystemTable;
 EFI_BOOT_SERVICES	*gBootServices;
 EFI_RUNTIME_SERVICES	*gRuntimeServices;
 
+EFI_GET_VARIABLE oGetVar = NULL;
+
+EFI_GET_VARIABLE pGetVar = NULL;
+
+int cnt = 0;
+
+
 #define PAGE_SIZE 0x1000
 //
 // We support unload (but deny it)
@@ -154,6 +161,50 @@ InitializeLib(
 	gRT = gRuntimeServices;
 }
 
+EFI_STATUS hkGetVar(
+	IN     CHAR16                      *VariableName,
+	IN     EFI_GUID                    *VendorGuid,
+	OUT    UINT32                      *Attributes, OPTIONAL
+	IN OUT UINTN                       *DataSize,
+	OUT    VOID                        *Data           OPTIONAL
+)
+{
+	cnt++;
+
+	/*
+	if (cnt > 5)
+	{
+	Print(L"FAILED FASTED\r\n");
+
+	int b = 0;
+
+	b = b + 1;
+
+	b = b + 2;
+
+	return oGetVar(NULL, VendorGuid, Attributes, DataSize, NULL);
+	}
+	(
+	*/
+
+
+	//__debugbreak();
+
+	__debugbreak();
+
+	return oGetVar(VariableName, VendorGuid, Attributes, DataSize, Data);
+}
+
+VOID
+EFIAPI
+CallbackMemMap(
+	IN  EFI_EVENT	Event,
+	IN  VOID      *Context
+)
+{
+	gRT->ConvertPointer(1, (VOID**)&pGetVar);
+}
+
 VOID
 EFIAPI
 CallbackExitBootServices(
@@ -194,11 +245,9 @@ CallbackExitBootServices(
 
 	//gBS->AllocatePool(EfiRuntimeServicesCode, sizeof(messageBox64bit_sc), (VOID**)&messageBox64bit_sc);
 
-	Print(L"%s\r\n", g_LoadOrderModules);
-	//Print(L"%s\r\n", g_CoreDrivers);
-	__debugbreak();
-	UtilWaitForKey();
-	Print(L"exit bs\r\n");
+	Print(L"pre: %x\r\n", pGetVar);
+	//Print(L"%s\r\n", g_LoadOrderModules);
+	//Print(L"%llx\r\n", oGetVar);
 }
 
 VOID EFIAPI hkOslArchTransferToKernel(PLOADER_PARAMETER_BLOCK KernelParams, VOID *KiSystemStartup)
@@ -262,10 +311,23 @@ VOID EFIAPI hkOslFwpKernelSetupPhase1(PLOADER_PARAMETER_BLOCK a1)
 
 	PrintLoadedModules(&a1->LoadOrderListHead, g_LoadOrderModules);
 	//PrintLoadedModules(&a1->CoreDriverListHead, g_CoreDrivers, L"Core")
+	pGetVar = hkGetVar;
+
+	//addr1 = (UINT64*)a1;
+	oOslFwpKernelSetupPhase1(a1);
+
+	oGetVar = a1->FirmwareInformation.u.EfiInformation.VirtualEfiRuntimeServices->GetVariable;
+
+	a1->FirmwareInformation.u.EfiInformation.VirtualEfiRuntimeServices->GetVariable = pGetVar;
+
+	DebugPrint(DEBUG_ERROR, "hi");
 
 	__debugbreak();
 
-	oOslFwpKernelSetupPhase1(a1);
+	//oGetVar = a1->FirmwareInformation.u.EfiInformation.VirtualEfiRuntimeServices->GetVariable;
+	//a1->FirmwareInformation.u.EfiInformation.VirtualEfiRuntimeServices->GetVariable = pGetVar;
+
+	//addr2 = (UINT64*)a1;
 }
 
 __int64 hkRtlImageNtHeaderEx(int a1, unsigned __int64 Base, unsigned __int64 Size, unsigned __int64 *a4)
@@ -282,7 +344,7 @@ __int64 hkRtlImageNtHeaderEx(int a1, unsigned __int64 Base, unsigned __int64 Siz
 
 		oOslArchTransferToKernel = (tOslArchTransferToKernel)UtilCallAddress(Found);
 
-		Print(L"final addr: %lx\r\n", oOslArchTransferToKernel);
+		//Print(L"final addr: %lx\r\n", oOslArchTransferToKernel);
 		//DbgMsg(__FILE__, __LINE__, "here\r\n");
 
 		OslArchTransferToKernelCallPatchLocation = (VOID*)Found;
@@ -310,6 +372,16 @@ __int64 hkRtlImageNtHeaderEx(int a1, unsigned __int64 Base, unsigned __int64 Siz
 		// Do patching 
 		*(UINT8*)FoundSetup = 0xE8;
 		*(UINT32*)(FoundSetup + 1) = UtilCalcRelativeCallOffset((VOID*)FoundSetup, (VOID*)&hkOslFwpKernelSetupPhase1);
+
+//		EFI_PHYSICAL_ADDRESS Addr = 0;
+
+		// allocate memory for executable image
+		/*EFI_STATUS Status = gBS->AllocatePool(
+			AllocateAnyPages,
+			EfiRuntimeServicesData,
+			PagesCount,
+			&Addr
+		);*/
 	}
 	else
 	{
@@ -331,7 +403,6 @@ hkImageStart(
 
 	EFI_STATUS				Status;
 	EFI_LOADED_IMAGE_PROTOCOL		*Image;
-	CHAR16					*FilePathText = NULL;
 
 	Print(L"->StartImage(0x%lx, , )\n", ImageHandle);
 
@@ -373,7 +444,7 @@ hkImageStart(
 		// Found address, now let's do our patching
 		UINT32 NewCallRelative = 0;
 
-		Print(L"Found ImgArchEfiStartBootApplication call at %lx\n", Found);
+		//Print(L"Found ImgArchEfiStartBootApplication call at %lx\n", Found);
 
 		// Save original call
 
@@ -382,16 +453,16 @@ hkImageStart(
 		UtilFindPattern(origSig, 0xCC, sizeof(origSig), Image->ImageBase, (UINT32)Image->ImageSize, (VOID**)&orig);
 		oRtlImageNtHeaderEx = (tRtlImageNtHeaderEx)(orig);
 
-		Print(L"call address %lx\r\n", oRtlImageNtHeaderEx);
+		//Print(L"call address %lx\r\n", oRtlImageNtHeaderEx);
 
 		// Backup original bytes and patch location before patching
 		ImgArchEfiStartBootApplicationPatchLocation = (VOID*)Found;
 
-		Print(L"Original address %lx\r\n", ImgArchEfiStartBootApplicationPatchLocation);
+		//Print(L"Original address %lx\r\n", ImgArchEfiStartBootApplicationPatchLocation);
 		CopyMem(ImgArchEfiStartBootApplicationBackup, ImgArchEfiStartBootApplicationPatchLocation, 5);
 		// Patch call to jump to our hkImgArchEfiStartBootApplication hook
 		NewCallRelative = UtilCalcRelativeCallOffset((VOID*)Found, (VOID*)&hkRtlImageNtHeaderEx);
-		Print(L"offset %lx\r\n", NewCallRelative);
+		//Print(L"offset %lx\r\n", NewCallRelative);
 
 		*(UINT8*)Found = 0xE8; // Write call opcode
 		*(UINT32*)(Found + 1) = NewCallRelative; // Write the new relative call offset
@@ -400,8 +471,6 @@ hkImageStart(
 	{
 		Print(L"\r\nPatchWindowsBootManager error, failed to find Archpx64TransferTo64BitApplicationAsm patch location. Status: %lx\r\n", EfiStatus);
 	}
-
-	FreePool(FilePathText);
 	Status = g_pImageStart(ImageHandle, ExitDataSize, ExitData);
 
 	return Status;
@@ -676,6 +745,8 @@ UefiMain(
 
 	EFI_EVENT Event;
 	gBootServices->CreateEventEx(0x200, 0x10, &CallbackExitBootServices, NULL, &EXIT_BOOT_SERVICES_GUID, &Event);
+
+	gBootServices->CreateEventEx(0x200, 0x10, &CallbackMemMap, NULL, &CC, &Event);
 
 	g_pImageStart = gBS->StartImage;
 	gBS->StartImage = hkImageStart;

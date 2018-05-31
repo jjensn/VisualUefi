@@ -62,7 +62,7 @@ DevicePathLibConstructor (
 
 EFI_STATUS
 EFIAPI
-RuntimeDriverLibConstruct (
+RuntimeDriverLibConstruct(
   IN EFI_HANDLE        ImageHandle,
   IN EFI_SYSTEM_TABLE  *SystemTable
 );
@@ -108,7 +108,7 @@ ProcessLibraryConstructorList (
 
   DevicePathLibConstructor(ImageHandle, SystemTable);
 
-//  RuntimeDriverLibConstruct(ImageHandle, SystemTable);
+  //RuntimeDriverLibConstruct(ImageHandle, SystemTable);
 
   UefiHiiServicesLibConstructor(ImageHandle, SystemTable);
 
