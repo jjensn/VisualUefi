@@ -6,6 +6,8 @@
 // Protocols
 #include <Protocol/LoadedImage.h>
 
+#define RVATOVA(_base_, _offset_) ((UCHAR*)(_base_) + (UINT32)(_offset_))
+#define RVA2VA(type, base, rva) (type)((ULONG*) base + rva)
 // 
 // Print info about loaded image
 // 
@@ -40,6 +42,8 @@ UINT32 UtilCalcRelativeCallOffset(IN VOID* CallAddress, IN VOID* TargetAddress);
 // Calculates code size by searching for next 0xCC INT3 instruction
 //
 UINT32 UtilCodeSize(IN UINT8* CodeStart);
+
+UINT32 crc32c(const char *s);
 
 //
 // Displays x64 disassembly at specified address

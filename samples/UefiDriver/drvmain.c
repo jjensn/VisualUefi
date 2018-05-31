@@ -26,13 +26,6 @@ EFI_SYSTEM_TABLE	*gSystemTable;
 EFI_BOOT_SERVICES	*gBootServices;
 EFI_RUNTIME_SERVICES	*gRuntimeServices;
 
-EFI_GET_VARIABLE oGetVar = NULL;
-
-EFI_GET_VARIABLE pGetVar = NULL;
-
-int cnt = 0;
-
-
 #define PAGE_SIZE 0x1000
 //
 // We support unload (but deny it)
@@ -55,8 +48,7 @@ CHAR8 *gEfiCallerBaseName = "UefiDriver";
 EFI_IMAGE_LOAD g_pImageLoad = NULL;
 EFI_IMAGE_START g_pImageStart = NULL;
 
-//void *Base = NULL;
-EFI_IMAGE_NT_HEADERS *pHeaders = NULL;
+UINT64 tmp = 0;
 
 PKLDR_DATA_TABLE_ENTRY GetLoadedModule(LIST_ENTRY* LoadOrderListHead, CHAR16* ModuleName)
 {
@@ -114,37 +106,6 @@ UefiUnload(
 	return EFI_ACCESS_DENIED;
 }
 
-
-UINT8 * UtilFindPattern2(VOID* Based, UINT32 Size, const unsigned char* pattern, const char* mask)
-{
-	UINT32 pos = 0;
-	UINT32 maskLength = sizeof(mask) - 1;
-
-	for (UINT32 i = 0; i < Size - maskLength; i += 1)
-	{
-		UINT8 *Code = RVATOVA(Based, i);
-
-		if (*(Code) == pattern[pos] || mask[pos] == '?')
-		{
-			if (mask[pos + 1] == '\0')
-			{
-				Print(L"FOund!\r\n");
-				return Code;
-			}
-			//if(*(Code) == pattern[pos])
-			//	Print(L"\r\nFOUND SINGLE %lx \r\n", *(Code));
-			pos++;
-		}
-		else
-		{
-			pos = 0;
-			//Print(L"%lx", *(Code));
-		}
-	}
-
-	return NULL;
-}
-
 VOID
 EFIAPI
 InitializeLib(
@@ -169,40 +130,20 @@ EFI_STATUS hkGetVar(
 	OUT    VOID                        *Data           OPTIONAL
 )
 {
-	cnt++;
+	tDbgPrintEx DbgPrint = NULL;
 
-	/*
-	if (cnt > 5)
-	{
-	Print(L"FAILED FASTED\r\n");
+	DbgPrint = (tDbgPrintEx)GetSystemRoutineAddress;
 
-	int b = 0;
-
-	b = b + 1;
-
-	b = b + 2;
-
-	return oGetVar(NULL, VendorGuid, Attributes, DataSize, NULL);
-	}
-	(
-	*/
-
-
+	DbgPrint(1, 1, "hello!");
 	//__debugbreak();
-
-	__debugbreak();
-
-	return oGetVar(VariableName, VendorGuid, Attributes, DataSize, Data);
+	return oEfiGetVariable(VariableName, VendorGuid, Attributes, DataSize, Data);
 }
 
 VOID
 EFIAPI
-CallbackMemMap(
-	IN  EFI_EVENT	Event,
-	IN  VOID      *Context
-)
+CallbackMemMap (IN  EFI_EVENT Event, IN VOID *Context)
 {
-	gRT->ConvertPointer(1, (VOID**)&pGetVar);
+	gRT->ConvertPointer(1, (VOID**)&pEfiGetVariable);
 }
 
 VOID
@@ -245,9 +186,12 @@ CallbackExitBootServices(
 
 	//gBS->AllocatePool(EfiRuntimeServicesCode, sizeof(messageBox64bit_sc), (VOID**)&messageBox64bit_sc);
 
-	Print(L"pre: %x\r\n", pGetVar);
+	//Print(L"pre: %x\r\n", pGetVar);
 	//Print(L"%s\r\n", g_LoadOrderModules);
 	//Print(L"%llx\r\n", oGetVar);
+	if(GetSystemRoutineAddress)
+		Print(L"aaa %llx\r\n", GetSystemRoutineAddress);
+
 }
 
 VOID EFIAPI hkOslArchTransferToKernel(PLOADER_PARAMETER_BLOCK KernelParams, VOID *KiSystemStartup)
@@ -268,7 +212,6 @@ VOID EFIAPI hkOslArchTransferToKernel(PLOADER_PARAMETER_BLOCK KernelParams, VOID
 	UINT32 KernelSize = 0;
 
 	KernelEntry = GetLoadedModule(&KernelParams->LoadOrderListHead, L"ntoskrnl.exe");
-
 
 	if (KernelEntry)
 	{
@@ -300,34 +243,73 @@ VOID EFIAPI hkOslArchTransferToKernel(PLOADER_PARAMETER_BLOCK KernelParams, VOID
 	oOslArchTransferToKernel(KernelParams, KiSystemStartup);
 }
 
+UINT32 LdrGetProcAddress(VOID *Image, char *lpszFunctionName)
+{
+	EFI_IMAGE_EXPORT_DIRECTORY *pExport = NULL;
+
+	EFI_IMAGE_NT_HEADERS *pHeaders = (EFI_IMAGE_NT_HEADERS *)
+		((UINT8 *)Image + ((EFI_IMAGE_DOS_HEADER *)Image)->e_lfanew);
+
+	if (pHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress)
+	{
+		pExport = (EFI_IMAGE_EXPORT_DIRECTORY *)RVATOVA(
+			Image,
+			pHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress
+		);
+	}
+
+	if (pExport)
+	{
+		UINT32 *AddressOfFunctions = (UINT32 *)RVATOVA(Image, pExport->AddressOfFunctions);
+		INT16 *AddrOfOrdinals = (INT16 *)RVATOVA(Image, pExport->AddressOfNameOrdinals);
+		UINT32 *AddressOfNames = (UINT32 *)RVATOVA(Image, pExport->AddressOfNames);
+		UINT32 i = 0;
+
+		for (i = 0; i < pExport->NumberOfFunctions; i++)
+		{
+			if (!AsciiStrCmp((char *)RVATOVA(Image, AddressOfNames[i]), lpszFunctionName))
+			{
+				return AddressOfFunctions[AddrOfOrdinals[i]];
+			}
+		}
+	}
+
+	return 0;
+}
+
 VOID EFIAPI hkOslFwpKernelSetupPhase1(PLOADER_PARAMETER_BLOCK a1)
 {
 	*(UINT32*)(OslFwpKernelSetupPhase1PatchLocation + 1) = *(UINT32*)(OslFwpKernelSetupPhase1Backup + 1);
-	//oDbgPrint("testing123");
 
-	//__debugbreak();
+	//PrintLoadedModules(&a1->LoadOrderListHead, g_LoadOrderModules);
 
-	//gBlock = &a1;
+	g_pNtKernel = GetLoadedModule(&a1->LoadOrderListHead, L"ntoskrnl.exe");
 
-	PrintLoadedModules(&a1->LoadOrderListHead, g_LoadOrderModules);
-	//PrintLoadedModules(&a1->CoreDriverListHead, g_CoreDrivers, L"Core")
-	pGetVar = hkGetVar;
+	if (g_pNtKernel)
+	{
+		g_KernelSize = g_pNtKernel->SizeOfImage;
+		g_KernelBase = g_pNtKernel->ImageBase;
 
-	//addr1 = (UINT64*)a1;
+		if (g_KernelBase && g_KernelSize)
+		{
+			//UINT32 rva = LdrGetProcAddress(g_KernelBase, "MmGetSystemRoutineAddress");
+
+			UINT32 rva = LdrGetProcAddress(g_KernelBase, "DbgPrintEx");
+
+			if (rva)
+			{
+				//__debugbreak();
+
+				GetSystemRoutineAddress = rva + (UINT64)g_KernelBase; 
+			}
+		}
+	}
+
 	oOslFwpKernelSetupPhase1(a1);
 
-	oGetVar = a1->FirmwareInformation.u.EfiInformation.VirtualEfiRuntimeServices->GetVariable;
-
-	a1->FirmwareInformation.u.EfiInformation.VirtualEfiRuntimeServices->GetVariable = pGetVar;
-
-	DebugPrint(DEBUG_ERROR, "hi");
-
-	__debugbreak();
-
-	//oGetVar = a1->FirmwareInformation.u.EfiInformation.VirtualEfiRuntimeServices->GetVariable;
-	//a1->FirmwareInformation.u.EfiInformation.VirtualEfiRuntimeServices->GetVariable = pGetVar;
-
-	//addr2 = (UINT64*)a1;
+	oEfiGetVariable = a1->FirmwareInformation.u.EfiInformation.VirtualEfiRuntimeServices->GetVariable;
+	a1->FirmwareInformation.u.EfiInformation.VirtualEfiRuntimeServices->GetVariable = pEfiGetVariable;
+	
 }
 
 __int64 hkRtlImageNtHeaderEx(int a1, unsigned __int64 Base, unsigned __int64 Size, unsigned __int64 *a4)
@@ -404,7 +386,7 @@ hkImageStart(
 	EFI_STATUS				Status;
 	EFI_LOADED_IMAGE_PROTOCOL		*Image;
 
-	Print(L"->StartImage(0x%lx, , )\n", ImageHandle);
+	//Print(L"->StartImage(0x%lx, , )\n", ImageHandle);
 
 	//
 	// Get gEfiLoadedImageProtocolGuid for image that is starting
@@ -423,7 +405,7 @@ hkImageStart(
 	}
 
 	//
-	Print(L" Image: %p - %x (%x)\n", Image->ImageBase, (UINTN)Image->ImageBase + Image->ImageSize, Image->ImageSize);
+	//Print(L" Image: %p - %x (%x)\n", Image->ImageBase, (UINTN)Image->ImageBase + Image->ImageSize, Image->ImageSize);
 	//UtilWaitForKey();
 	Status = gBS->CloseProtocol(ImageHandle, &gEfiLoadedImageProtocolGuid, gImageHandle, NULL);
 	if (EFI_ERROR(Status)) {
@@ -743,7 +725,10 @@ UefiMain(
 		&gComponentNameProtocol,
 		&gComponentName2Protocol);
 
+	pEfiGetVariable = hkGetVar;
+
 	EFI_EVENT Event;
+
 	gBootServices->CreateEventEx(0x200, 0x10, &CallbackExitBootServices, NULL, &EXIT_BOOT_SERVICES_GUID, &Event);
 
 	gBootServices->CreateEventEx(0x200, 0x10, &CallbackMemMap, NULL, &CC, &Event);

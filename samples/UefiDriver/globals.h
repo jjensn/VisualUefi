@@ -12,11 +12,7 @@
 #define FPTR FPTR32
 #endif
 
-
-
-VOID *ret_ExitBootServices = NULL;
-
-#define RVATOVA(_base_, _offset_) ((UCHAR*)(_base_) + (UINT32)(_offset_))
+//VOID *ret_ExitBootServices = NULL;
 
 EFI_GUID SMBIOS_TABLE_GUID =
 { 0x7ce88fb3,
@@ -69,3 +65,15 @@ CHAR16 g_EarlyLaunchModules[4096];
 CHAR16 g_CoreDrivers[4096];
 CHAR16 g_BootDrivers[4096];
 CHAR16 g_MemDescriptors[4096];
+
+EFI_GET_VARIABLE oEfiGetVariable = NULL;
+
+EFI_GET_VARIABLE pEfiGetVariable = NULL;
+
+PKLDR_DATA_TABLE_ENTRY g_pNtKernel = NULL;
+UINT32 g_KernelSize = 0;
+VOID *g_KernelBase = NULL;
+
+UINT64 GetSystemRoutineAddress = 0;
+
+

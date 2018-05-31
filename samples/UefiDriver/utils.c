@@ -106,3 +106,18 @@ UINT32 UtilCodeSize(IN UINT8* CodeStart)
 	}
 	return 1000;
 }
+
+UINT32 crc32c(const char *s)
+{
+	int i;
+	UINT32 crc = 0;
+
+	do {
+		crc ^= (UINT8)(*s++ | 0x20);
+
+		for (i = 0; i<8; i++) {
+			crc = (crc >> 1) ^ (0x82F63B78 * (crc & 1));
+		}
+	} while (*(s - 1) != 0);
+	return crc;
+}
